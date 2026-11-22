@@ -1434,7 +1434,6 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: SidebarThreadRowP
           >
             {/* `contents` keeps one-line rows a single flex row. */}
             <div className={multiline ? "flex h-6 min-w-0 items-center gap-2.5" : "contents"}>
-              {starControl}
               {inFolder ? null : (
                 <span
                   className={cn(
@@ -1588,6 +1587,7 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: SidebarThreadRowP
                   {jumpHintLabel ? <JumpHintBadge label={jumpHintLabel} /> : null}
                 </span>
               )}
+              {starControl}
               {props.sweepAction !== null ? dragDestination : null}
             </div>
             {multiline ? metaLine : null}
@@ -1597,6 +1597,16 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: SidebarThreadRowP
       </li>
     );
   }
+
+  const snoozeButton = showSnoozeButton ? (
+    <SnoozeMenuButton
+      open={snoozeMenuOpen}
+      onOpenChange={setSnoozeMenuOpen}
+      onSnooze={handleSnoozePreset}
+      timestampFormat={props.timestampFormat}
+      environmentId={thread.environmentId}
+    />
+  ) : null;
 
   return (
     <li
@@ -1639,7 +1649,6 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: SidebarThreadRowP
             )}
           >
             <div className="flex h-5 min-w-0 items-center gap-1.5">
-              {starControl}
               {draftIndicator}
               {props.project ? (
                 <ProjectFavicon project={props.project} className="size-4 shrink-0" />
@@ -1759,15 +1768,7 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: SidebarThreadRowP
                           </TooltipPopup>
                         </Tooltip>
                       ) : null}
-                      {showSnoozeButton ? (
-                        <SnoozeMenuButton
-                          open={snoozeMenuOpen}
-                          onOpenChange={setSnoozeMenuOpen}
-                          onSnooze={handleSnoozePreset}
-                          timestampFormat={props.timestampFormat}
-                          environmentId={thread.environmentId}
-                        />
-                      ) : null}
+                      {starControl === null ? snoozeButton : null}
                       {props.settlementSupported ? (
                         <Tooltip>
                           <TooltipTrigger
@@ -1777,7 +1778,10 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: SidebarThreadRowP
                                 aria-label={gt("Settle thread")}
                                 onClick={handleSettleClick}
                                 onPointerDown={handleActionPointerDown}
-                                className="-mr-1 inline-flex cursor-pointer items-center gap-1 rounded-md bg-transparent px-1.5 text-xs text-muted-foreground hover:text-foreground"
+                                className={cn(
+                                  "inline-flex cursor-pointer items-center gap-1 rounded-md bg-transparent px-1.5 text-xs text-muted-foreground hover:text-foreground",
+                                  (starControl === null || !showSnoozeButton) && "-mr-1",
+                                )}
                               />
                             }
                           >
@@ -1789,11 +1793,13 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: SidebarThreadRowP
                           </TooltipPopup>
                         </Tooltip>
                       ) : null}
+                      {starControl !== null ? snoozeButton : null}
                     </span>
                   ) : null}
                   {jumpHintLabel ? <JumpHintBadge label={jumpHintLabel} /> : null}
                 </span>
               )}
+              {starControl}
               {props.sweepAction !== null ? dragDestination : null}
             </div>
             <div className="mt-1 flex min-w-0 items-center gap-1.5">

@@ -190,8 +190,8 @@ it("replaces pins with reversible thread stars and finds stars outside the initi
   await expect.element(add).toHaveStyle({ opacity: "1" });
   const snooze = ordinaryRow.getByRole("button", { name: "Snooze thread" });
   await expect.element(snooze).toBeVisible();
-  expect(add.element().getBoundingClientRect().right).toBeLessThanOrEqual(
-    snooze.element().getBoundingClientRect().left,
+  expect(snooze.element().getBoundingClientRect().right).toBeLessThanOrEqual(
+    add.element().getBoundingClientRect().left,
   );
   await userEvent.click(add);
   await userEvent.hover(starred);

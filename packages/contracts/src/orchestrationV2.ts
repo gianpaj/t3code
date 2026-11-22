@@ -2479,6 +2479,13 @@ export function isOlderSettledThreadShell(
   );
 }
 
+export function resolveThreadStar(
+  thread: Pick<OrchestrationV2ThreadShell, "starColor" | "pinnedAt">,
+): ThreadStarColor | null {
+  if (thread.starColor !== undefined) return thread.starColor;
+  return thread.pinnedAt != null ? "green" : null;
+}
+
 export const OrchestrationV2OlderSettledCount = Schema.Struct({
   projectId: ProjectId,
   count: NonNegativeInt,
@@ -3331,6 +3338,7 @@ export const OrchestrationV2Command = Schema.Union([
     threadId: ThreadId,
     expectedLatestRunId: Schema.optional(RunId),
     settledAt: Schema.optional(Schema.DateTimeUtc),
+    preservePin: Schema.optionalKey(Schema.Boolean),
   }),
   /** Rejects changes since snapshotAt or any explicit settled override to preserve user actions. */
   Schema.Struct({

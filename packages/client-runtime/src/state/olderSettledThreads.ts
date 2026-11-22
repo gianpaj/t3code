@@ -2,6 +2,7 @@ import {
   isListedThreadLineage,
   isOlderSettledThreadShell,
   ORCHESTRATION_V2_WS_METHODS,
+  resolveThreadStar,
   type EnvironmentId,
   type OrchestrationV2OlderSettledCursor,
   type OrchestrationV2OlderSettledThreadsPage,
@@ -56,7 +57,7 @@ const NO_PAGES: OlderSettledPages = { reads: [], frontier: null, status: "ready"
 
 type OlderSettledRow = Pick<
   OrchestrationV2ThreadShell,
-  "id" | "projectId" | "lineage" | "settledOverride" | "settledAt" | "starColor"
+  "id" | "projectId" | "lineage" | "settledOverride" | "settledAt" | "starColor" | "pinnedAt"
 >;
 
 export interface OlderSettledShelfEnvironment {
@@ -95,7 +96,10 @@ export function olderSettledCountKey(
   for (const sequence of removedAt.values()) lastRemoval = Math.max(lastRemoval, sequence);
   const rows: string[] = [];
   for (const thread of threads) {
-    if (!isListedThreadLineage(thread.lineage) || (starredOnly && thread.starColor == null)) {
+    if (
+      !isListedThreadLineage(thread.lineage) ||
+      (starredOnly && resolveThreadStar(thread) === null)
+    ) {
       continue;
     }
     const older = isOlderSettledThreadShell(thread, beforeMs);
@@ -184,7 +188,7 @@ export function unloadedOlderSettledCount(input: {
       if (
         thread.environmentId === scope.environmentId &&
         (scope.projectIds === null || scope.projectIds.includes(thread.source.projectId)) &&
-        (!scope.starredOnly || thread.source.starColor != null) &&
+        (!scope.starredOnly || resolveThreadStar(thread.source) !== null) &&
         isOlderSettledThreadShell(thread.source, older.beforeMs)
       ) {
         unloaded -= 1;

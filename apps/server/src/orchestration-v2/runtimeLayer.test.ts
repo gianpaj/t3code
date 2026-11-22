@@ -3796,13 +3796,13 @@ it.layer(layerTest)("OrchestrationV2LayerLive lifecycle", (it) => {
       ] as const) {
         yield* setStar(step, color);
         const shell = shellOf(yield* orchestrator.getShellSnapshot());
-        assert.equal(shell.starColor ?? null, color);
+        assert.equal(shell.starColor, color);
         assert.deepEqual(shell.updatedAt, taggedShell.updatedAt);
         assert.deepEqual(shell.lastVisitedAt, taggedShell.lastVisitedAt);
         assert.equal(shell.activeOrderKey, taggedShell.activeOrderKey);
       }
       yield* setStar("first", "green");
-      assert.isNull(shellOf(yield* orchestrator.getShellSnapshot()).starColor ?? null);
+      assert.isNull(shellOf(yield* orchestrator.getShellSnapshot()).starColor);
 
       const preAutoProjection = yield* orchestrator.getThreadProjection(threadId);
       const staleAutoSettle = yield* orchestrator
@@ -3875,10 +3875,28 @@ it.layer(layerTest)("OrchestrationV2LayerLive lifecycle", (it) => {
         type: "thread.pin",
         commandId: CommandId.make("runtime-layer-lifecycle-pin-settled"),
         threadId,
+        orderKey: "a0",
       });
       const pinnedProjection = yield* orchestrator.getThreadProjection(threadId);
       assert.equal(pinnedProjection.thread.settledOverride, "active");
       assert.isNotNull(pinnedProjection.thread.unsettledAt);
+
+      yield* orchestrator.dispatch({
+        type: "thread.settle",
+        commandId: CommandId.make("runtime-layer-lifecycle-settle-with-pin"),
+        threadId,
+        preservePin: true,
+      });
+      const settledWithPin = shellOf(yield* orchestrator.getShellSnapshot());
+      assert.equal(settledWithPin.settledOverride, "settled");
+      assert.deepEqual(settledWithPin.pinnedAt, pinnedProjection.thread.pinnedAt);
+      assert.equal(settledWithPin.pinOrderKey, "a0");
+      yield* orchestrator.dispatch({
+        type: "thread.settle",
+        commandId: CommandId.make("runtime-layer-lifecycle-settle-clear-pin"),
+        threadId,
+      });
+      assert.isNull((yield* orchestrator.getThreadProjection(threadId)).thread.pinnedAt);
 
       const archive = yield* orchestrator.dispatch({
         type: "thread.archive",

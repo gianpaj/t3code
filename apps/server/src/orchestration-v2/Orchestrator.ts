@@ -4955,9 +4955,9 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
         case "thread.unarchive":
           return { ...thread, archivedAt: null, updatedAt: now };
         case "thread.settle": {
-          const wasPinned = thread.pinnedAt != null;
+          const unpin = thread.pinnedAt != null && command.preservePin !== true;
           const alreadySettled =
-            thread.settledOverride === "settled" && thread.settledAt !== null && !wasPinned;
+            thread.settledOverride === "settled" && thread.settledAt !== null && !unpin;
           return {
             ...thread,
             settledOverride: "settled",
@@ -4968,8 +4968,7 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
               : thread.limitRecovery,
             pullRequests: thread.pullRequests?.map((link) => withPullRequestWatch(link, undefined)),
             unsettledAt: null,
-            pinnedAt: null,
-            pinOrderKey: null,
+            ...(command.preservePin === true ? {} : { pinnedAt: null, pinOrderKey: null }),
             activeOrderKey: null,
             snoozedUntil: null,
             snoozedAt: null,

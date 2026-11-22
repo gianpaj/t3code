@@ -2017,7 +2017,9 @@ export function threadShellFromProjection(
     autoSettleDisabledAt: projection.thread.autoSettleDisabledAt ?? null,
     pinOrderKey: projection.thread.pinOrderKey ?? null,
     ...(projection.thread.tags?.length ? { tags: projection.thread.tags } : {}),
-    ...(projection.thread.starColor != null ? { starColor: projection.thread.starColor } : {}),
+    ...(projection.thread.starColor !== undefined
+      ? { starColor: projection.thread.starColor }
+      : {}),
     lastVisitedAt: projection.thread.lastVisitedAt,
     opens: projection.thread.opens ?? null,
     titleRegeneration: projection.thread.titleRegeneration ?? null,
@@ -2316,7 +2318,9 @@ function shellFromState(input: {
     autoSettleDisabledAt: input.state.thread.autoSettleDisabledAt ?? null,
     pinOrderKey: input.state.thread.pinOrderKey ?? null,
     ...(input.state.thread.tags?.length ? { tags: input.state.thread.tags } : {}),
-    ...(input.state.thread.starColor != null ? { starColor: input.state.thread.starColor } : {}),
+    ...(input.state.thread.starColor !== undefined
+      ? { starColor: input.state.thread.starColor }
+      : {}),
     lastVisitedAt: input.state.thread.lastVisitedAt,
     opens: input.state.thread.opens ?? null,
     titleRegeneration: input.state.thread.titleRegeneration ?? null,
@@ -9717,7 +9721,17 @@ export const layer: Layer.Layer<ProjectionStoreV2, never, SqlClient.SqlClient> =
           AND json_extract(t.payload_json, '$.lineage.sideChat') IS NOT 1
           AND json_extract(t.payload_json, '$.settledOverride') = 'settled'
           AND json_extract(t.payload_json, '$.settledAt') IS NOT NULL
-          ${starredOnly ? sql`AND json_extract(t.payload_json, '$.starColor') IS NOT NULL` : sql``}
+          ${
+            starredOnly
+              ? sql`AND (
+            json_extract(t.payload_json, '$.starColor') IS NOT NULL
+            OR (
+              json_type(t.payload_json, '$.starColor') IS NULL
+              AND json_extract(t.payload_json, '$.pinnedAt') IS NOT NULL
+            )
+          )`
+              : sql``
+          }
           ${projectIds === undefined ? sql`` : sql` AND t.project_id IN ${sql.in(projectIds)}`}
       `;
       const belowCursor =

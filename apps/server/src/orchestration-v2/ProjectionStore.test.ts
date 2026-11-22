@@ -3273,6 +3273,7 @@ it.effect("SQL list older settled threads below a cursor", () =>
       readonly project?: string;
       readonly subagent?: boolean;
       readonly archived?: boolean;
+      readonly starColor?: "green" | "yellow" | "blue" | null;
       readonly snoozedUntilDay?: number;
     }) =>
       store.apply({
@@ -3306,14 +3307,15 @@ it.effect("SQL list older settled threads below a cursor", () =>
           settledAt: input.settledDay === null ? null : at(input.settledDay),
           snoozedUntil: input.snoozedUntilDay === undefined ? null : at(input.snoozedUntilDay),
           lastVisitedAt: null,
+          ...(input.starColor === undefined ? {} : { starColor: input.starColor }),
           deletedAt: null,
         },
       });
     yield* createThread({ name: "a", settledDay: 5 });
-    yield* createThread({ name: "b", settledDay: 4 });
-    yield* createThread({ name: "c", settledDay: 4 });
-    yield* createThread({ name: "d", settledDay: 3, project: "project:b" });
-    yield* createThread({ name: "snoozed", settledDay: 2, snoozedUntilDay: 30 });
+    yield* createThread({ name: "b", settledDay: 4, starColor: "green" });
+    yield* createThread({ name: "c", settledDay: 4, starColor: "yellow" });
+    yield* createThread({ name: "d", settledDay: 3, project: "project:b", starColor: "blue" });
+    yield* createThread({ name: "snoozed", settledDay: 2, snoozedUntilDay: 30, starColor: null });
     yield* createThread({ name: "recent", settledDay: 20 });
     yield* createThread({ name: "unsettled", settledDay: null });
     yield* createThread({ name: "child", settledDay: 1, subagent: true });
@@ -3346,6 +3348,29 @@ it.effect("SQL list older settled threads below a cursor", () =>
     const next = yield* list({ settledAt: DateTime.formatIso(at(4)), threadId: id("b") }, 10);
     assert.deepEqual(next.threadIds, [id("c"), id("d"), id("snoozed")]);
     assert.deepEqual(yield* list(before, 25, []), { threadIds: [], counts: [] });
+    const starred = (cursor: typeof before & { readonly threadId?: ThreadId }, limit: number) =>
+      store.listOlderSettledThreads({ before: cursor, limit, starredOnly: true });
+    assert.deepEqual((yield* starred(before, 1)).threadIds, [id("b")]);
+    assert.deepEqual(
+      (yield* starred({ settledAt: DateTime.formatIso(at(4)), threadId: id("b") }, 10)).threadIds,
+      [id("c"), id("d")],
+    );
+    assert.sameDeepMembers(
+      [...(yield* starred(before, 0)).counts],
+      [
+        { projectId: ProjectId.make("project:a"), count: 2 },
+        { projectId: ProjectId.make("project:b"), count: 1 },
+      ],
+    );
+    assert.deepEqual(
+      (yield* store.listOlderSettledThreads({
+        before,
+        limit: 10,
+        projectIds: [ProjectId.make("project:b")],
+        starredOnly: true,
+      })).threadIds,
+      [id("d")],
+    );
     yield* assertShellIndexCoversShells();
     const scoped = yield* list(before, 0, [ProjectId.make("project:b")]);
     assert.deepEqual(scoped, {

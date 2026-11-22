@@ -3780,6 +3780,30 @@ it.layer(layerTest)("OrchestrationV2LayerLive lifecycle", (it) => {
         DateTime.toEpochMillis(untaggedShell.updatedAt),
       );
 
+      const setStar = (step: string, color: "green" | "yellow" | "blue" | null) =>
+        orchestrator.dispatch({
+          type: "thread.star.set",
+          commandId: CommandId.make(`runtime-layer-lifecycle-star-${step}`),
+          threadId,
+          color,
+        });
+      yield* TestClock.adjust("1 minute");
+      for (const [step, color] of [
+        ["first", "green"],
+        ["second", "yellow"],
+        ["third", "blue"],
+        ["clear", null],
+      ] as const) {
+        yield* setStar(step, color);
+        const shell = shellOf(yield* orchestrator.getShellSnapshot());
+        assert.equal(shell.starColor ?? null, color);
+        assert.deepEqual(shell.updatedAt, taggedShell.updatedAt);
+        assert.deepEqual(shell.lastVisitedAt, taggedShell.lastVisitedAt);
+        assert.equal(shell.activeOrderKey, taggedShell.activeOrderKey);
+      }
+      yield* setStar("first", "green");
+      assert.isNull(shellOf(yield* orchestrator.getShellSnapshot()).starColor ?? null);
+
       const preAutoProjection = yield* orchestrator.getThreadProjection(threadId);
       const staleAutoSettle = yield* orchestrator
         .dispatch({

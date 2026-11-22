@@ -472,6 +472,9 @@ const OrchestrationV2LastTitleRegeneration = Schema.Struct({
   completedAt: Schema.DateTimeUtc,
 });
 
+export const ThreadStarColor = Schema.Literals(["green", "yellow", "blue"]);
+export type ThreadStarColor = typeof ThreadStarColor.Type;
+
 export const OrchestrationV2AppThread = Schema.Struct({
   ...OrchestrationV2CreationFields,
   id: ThreadId,
@@ -525,6 +528,7 @@ export const OrchestrationV2AppThread = Schema.Struct({
   activeOrderKey: Schema.optional(Schema.NullOr(TrimmedNonEmptyString)),
   /** Absent on threads written before tags existed; read as empty. */
   tags: Schema.optional(StoredThreadTags),
+  starColor: Schema.optionalKey(Schema.NullOr(ThreadStarColor)),
   lastVisitedAt: Schema.NullOr(Schema.DateTimeUtc).pipe(
     Schema.withDecodingDefault(Effect.succeed(null)),
   ),
@@ -2144,6 +2148,7 @@ export const OrchestrationV2DomainEvent = Schema.Union([
       "thread.pin-reordered",
       "thread.active-reordered",
       "thread.tags-updated",
+      "thread.star-updated",
       "thread.visited",
       "thread.marked-unread",
       "thread.metadata-updated",
@@ -2415,6 +2420,7 @@ export const OrchestrationV2ThreadShell = Schema.Struct({
   activeOrderKey: Schema.optional(Schema.NullOr(TrimmedNonEmptyString)),
   /** Absent on threads written before tags existed; read as empty. */
   tags: Schema.optional(StoredThreadTags),
+  starColor: Schema.optionalKey(Schema.NullOr(ThreadStarColor)),
   lastVisitedAt: Schema.optional(Schema.NullOr(Schema.DateTimeUtc)),
   opens: Schema.optional(LenientThreadOpens),
   titleRegeneration: Schema.optional(
@@ -3097,6 +3103,7 @@ export const OrchestrationV2DomainEventJson = Schema.Union([
       "thread.pin-reordered",
       "thread.active-reordered",
       "thread.tags-updated",
+      "thread.star-updated",
       "thread.visited",
       "thread.marked-unread",
       "thread.pull-request-synced",
@@ -3376,6 +3383,12 @@ export const OrchestrationV2Command = Schema.Union([
     threadId: ThreadId,
     tag: ThreadTag,
     tagged: Schema.Boolean,
+  }),
+  Schema.Struct({
+    type: Schema.Literal("thread.star.set"),
+    commandId: CommandId,
+    threadId: ThreadId,
+    color: Schema.NullOr(ThreadStarColor),
   }),
   Schema.Struct({
     type: Schema.Literal("thread.pin.reorder"),
@@ -4221,6 +4234,7 @@ export const OrchestrationV2GetOlderSettledThreadsInput = Schema.Struct({
   before: OrchestrationV2OlderSettledCursor,
   /** Every project when absent. */
   projectIds: Schema.optionalKey(Schema.Array(ProjectId)),
+  starredOnly: Schema.optionalKey(Schema.Boolean),
   /** 0 reads only the counts. */
   limit: Schema.Int.check(Schema.isBetween({ minimum: 0, maximum: 50 })),
 });

@@ -1117,6 +1117,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
   });
   const boringSidebarEnabled = useClientSettings((settings) => settings.boringSidebarEnabled);
   const priorityInboxEnabled = useClientSettings((settings) => settings.priorityInboxEnabled);
+  const threadStarsEnabled = useClientSettings((settings) => settings.threadStarsEnabled);
   const showPrioritySections = priorityInboxEnabled && !boringSidebarEnabled;
   const folderRowsMultiline = useClientSettings((settings) => settings.boringSidebarMultilineRows);
   const newThreadContext = useHandleNewThread();
@@ -1158,12 +1159,12 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
   const [selectedReadFilter, setReadFilter] = useState<ThreadReadFilter>("all");
   const readFilter = priorityInboxEnabled ? selectedReadFilter : "all";
   const [starredFilter, setStarredFilter] = useState(false);
-  const starredOnly = priorityInboxEnabled && starredFilter;
+  const starredOnly = threadStarsEnabled && starredFilter;
   const starredFilterRef = useRef<HTMLButtonElement>(null);
   const { pendingStars, cycleStar } = useThreadStars();
   const starThread = useStableCallback((threadRef: ScopedThreadRef) => {
     if (
-      priorityInboxEnabled &&
+      threadStarsEnabled &&
       serverConfigs.get(threadRef.environmentId)?.environment.capabilities.threadStars === true &&
       readEnvironmentScope(threadRef.environmentId, AuthOrchestrationOperateScope)
     ) {
@@ -2882,7 +2883,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
                   : null,
               isPinned,
               starActionLabel:
-                priorityInboxEnabled &&
+                threadStarsEnabled &&
                 serverConfigs.get(thread.environmentId)?.environment.capabilities.threadStars ===
                   true
                   ? threadStarLabel(
@@ -3456,6 +3457,21 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
       </ComboboxPopup>
     </Combobox>
   );
+  const starredFilterButton = threadStarsEnabled ? (
+    <SidebarHeaderIconButton
+      ref={starredFilterRef}
+      label={gt("Starred")}
+      isActive={starredOnly}
+      aria-pressed={starredOnly}
+      onClick={() => {
+        clearSelection();
+        setStarredFilter(!starredOnly);
+        scrollSidebarToTop(sidebarContentRef.current);
+      }}
+    >
+      <StarIcon className={starredOnly ? "fill-current" : undefined} />
+    </SidebarHeaderIconButton>
+  ) : null;
   return (
     <SidebarFolderDrop>
       <SidebarChromeHeader isElectron={isElectron} />
@@ -3466,7 +3482,14 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
           <SidebarGroup className="z-[1]">
             <SidebarThreadHeader
               hasProjects={projectGroups.length > 0}
-              projectScope={priorityInboxEnabled ? null : projectScopePicker}
+              projectScope={
+                priorityInboxEnabled ? null : (
+                  <>
+                    {starredFilterButton}
+                    {projectScopePicker}
+                  </>
+                )
+              }
               onNewProject={openAddProjectCommandPalette}
               onNewThread={handleNewThreadClick}
               newThreadDisabled={projects.length === 0}
@@ -3511,19 +3534,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
                     <span>{readFilterLabels[readFilter]}</span>
                   </SidebarMenuButton>
                 </div>
-                <SidebarHeaderIconButton
-                  ref={starredFilterRef}
-                  label={gt("Starred")}
-                  isActive={starredOnly}
-                  aria-pressed={starredOnly}
-                  onClick={() => {
-                    clearSelection();
-                    setStarredFilter(!starredOnly);
-                    scrollSidebarToTop(sidebarContentRef.current);
-                  }}
-                >
-                  <StarIcon className={starredOnly ? "fill-current" : undefined} />
-                </SidebarHeaderIconButton>
+                {starredFilterButton}
                 <div className="flex min-w-0 flex-1 items-center gap-1">
                   {projectShortcuts.map((project) => {
                     const selected = projectScopeKeys.includes(project.projectKey);
@@ -3751,12 +3762,12 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
                             }
                             thread={thread}
                             starColor={
-                              priorityInboxEnabled
+                              threadStarsEnabled
                                 ? visibleThreadStar(thread, pendingStars.get(threadKey))
                                 : null
                             }
                             starSupported={
-                              priorityInboxEnabled &&
+                              threadStarsEnabled &&
                               serverConfigs.get(thread.environmentId)?.environment.capabilities
                                 .threadStars === true
                             }

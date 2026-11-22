@@ -12477,5 +12477,7 @@
   "390c8fd5a77078ac": "Estrela amarela. Mudar para azul",
   "500de308bbfea78c": "Estrela azul. Remover estrela",
   "d119e8cc5f01d5a9": "Não foi possível atualizar a estrela da conversa",
-  "abb2bb2e140299a4": "{color, select, green {Estrela verde} yellow {Estrela amarela} other {Estrela azul}}"
+  "abb2bb2e140299a4": "{color, select, green {Estrela verde} yellow {Estrela amarela} other {Estrela azul}}",
+  "c59bdf5ee3dbd303": "Adicione estrelas coloridas às conversas e filtre a barra lateral para ver as conversas com estrela.",
+  "cdc5a7db2e3647c7": "Estrelas nas conversas"
 }

@@ -12484,5 +12484,7 @@
   "390c8fd5a77078ac": "Gul stjärna. Byt till blå",
   "500de308bbfea78c": "Blå stjärna. Ta bort stjärnan",
   "d119e8cc5f01d5a9": "Det gick inte att uppdatera trådens stjärna",
-  "abb2bb2e140299a4": "{color, select, green {Grön stjärna} yellow {Gul stjärna} other {Blå stjärna}}"
+  "abb2bb2e140299a4": "{color, select, green {Grön stjärna} yellow {Gul stjärna} other {Blå stjärna}}",
+  "c59bdf5ee3dbd303": "Märk trådar med färgade stjärnor och filtrera sidofältet på stjärnmärkta trådar.",
+  "cdc5a7db2e3647c7": "Stjärnor på trådar"
 }

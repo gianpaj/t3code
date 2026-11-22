@@ -505,6 +505,12 @@ export const SETTINGS_SEARCH_ITEMS = [
     searchTerms: [msg("beta sidebar project shortcuts unread read filter")],
   },
   {
+    id: "thread-stars",
+    title: msg("Thread stars"),
+    to: "/settings/labs",
+    searchTerms: [msg("Starred")],
+  },
+  {
     id: "boring-sidebar",
     title: msg("Boring sidebar (group by project)"),
     to: "/settings/labs",

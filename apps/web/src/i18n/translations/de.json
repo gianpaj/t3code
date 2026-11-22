@@ -12477,5 +12477,7 @@
   "390c8fd5a77078ac": "Gelber Stern. Zu Blau wechseln",
   "500de308bbfea78c": "Blauer Stern. Stern entfernen",
   "d119e8cc5f01d5a9": "Der Stern konnte nicht aktualisiert werden",
-  "abb2bb2e140299a4": "{color, select, green {Grüner Stern} yellow {Gelber Stern} other {Blauer Stern}}"
+  "abb2bb2e140299a4": "{color, select, green {Grüner Stern} yellow {Gelber Stern} other {Blauer Stern}}",
+  "c59bdf5ee3dbd303": "Markiere Threads mit farbigen Sternen und filtere die Seitenleiste nach markierten Threads.",
+  "cdc5a7db2e3647c7": "Thread-Sterne"
 }

@@ -21,6 +21,7 @@ export function LabsSettingsPanel() {
     <SettingsPageContainer>
       <SettingsSection id="beta" title={gt("Beta")}>
         <PriorityInboxRow />
+        <ThreadStarsRow />
         <BoringSidebarRow />
         {/* Clerk is only mounted when this build has T3 Connect. */}
         {hasCloudPublicConfig() ? <GuestLinksRowWithSignIn /> : <GuestLinksRow />}
@@ -49,6 +50,26 @@ function PriorityInboxRow() {
           checked={enabled}
           onCheckedChange={(checked) => updateSettings({ priorityInboxEnabled: checked })}
           aria-label={gt("Priority inbox")}
+        />
+      }
+    />
+  );
+}
+
+function ThreadStarsRow() {
+  const searchableSetting = useSearchableSetting();
+  const enabled = useScopedSettings((settings) => settings.threadStarsEnabled);
+  const updateSettings = useUpdateScopedSettings();
+  const gt = useGT();
+  return (
+    <SettingsRow
+      {...searchableSetting("thread-stars")}
+      description={gt("Add colored stars to threads and filter the sidebar by Starred.")}
+      control={
+        <Switch
+          checked={enabled}
+          onCheckedChange={(checked) => updateSettings({ threadStarsEnabled: checked })}
+          aria-label={gt("Thread stars")}
         />
       }
     />

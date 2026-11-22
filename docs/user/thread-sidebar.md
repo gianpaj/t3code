@@ -77,6 +77,10 @@ beyond the first five. You can collapse Priority and **Everything else** indepen
 If you use the Boring sidebar, threads stay grouped in project folders and the filters
 are available above them.
 
+Turn on **Thread stars** in the same Beta section. Click the star on a thread to cycle
+through green, yellow, and blue, then clear it. On touch screens, use the thread menu.
+The **Starred** filter shows any color, including stars in Settled.
+
 ## Pin and reorder threads
 
 Pin a thread from its menu to keep it above your active work.

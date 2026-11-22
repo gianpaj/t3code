@@ -12503,5 +12503,7 @@
   "390c8fd5a77078ac": "黄色星标。切换为蓝色",
   "500de308bbfea78c": "蓝色星标。移除星标",
   "d119e8cc5f01d5a9": "无法更新会话星标",
-  "abb2bb2e140299a4": "{color, select, green {绿色星标} yellow {黄色星标} other {蓝色星标}}"
+  "abb2bb2e140299a4": "{color, select, green {绿色星标} yellow {黄色星标} other {蓝色星标}}",
+  "c59bdf5ee3dbd303": "为会话添加彩色星标，并在侧边栏筛选已加星标的会话。",
+  "cdc5a7db2e3647c7": "会话星标"
 }

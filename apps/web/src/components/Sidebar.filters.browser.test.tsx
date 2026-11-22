@@ -122,11 +122,12 @@ it("gates the Priority inbox and its filters behind the Labs switch", async () =
 
   await router.navigate({ to: "/settings/labs" });
   await expect.element(labsSwitch).not.toBeChecked();
+  await expect.element(page.getByRole("switch", { name: "Thread stars" })).not.toBeChecked();
   await userEvent.click(labsSwitch);
   await expect.element(labsSwitch).toBeChecked();
   await router.navigate({ href: threadPath });
 
-  await expect.element(starredFilter).toBeVisible();
+  await expect.element(starredFilter).not.toBeInTheDocument();
   await expectPriority(9, 5);
   await expect.element(otherHeader).toHaveTextContent("Everything else1");
   await userEvent.click(renderProject);

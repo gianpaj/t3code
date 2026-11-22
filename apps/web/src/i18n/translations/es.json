@@ -12472,5 +12472,7 @@
   "390c8fd5a77078ac": "Estrella amarilla. Cambiar a azul",
   "500de308bbfea78c": "Estrella azul. Quitar estrella",
   "d119e8cc5f01d5a9": "No se pudo actualizar la estrella del hilo",
-  "abb2bb2e140299a4": "{color, select, green {Estrella verde} yellow {Estrella amarilla} other {Estrella azul}}"
+  "abb2bb2e140299a4": "{color, select, green {Estrella verde} yellow {Estrella amarilla} other {Estrella azul}}",
+  "c59bdf5ee3dbd303": "Añade estrellas de colores a los hilos y filtra la barra lateral por hilos con estrella.",
+  "cdc5a7db2e3647c7": "Estrellas en hilos"
 }

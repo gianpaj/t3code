@@ -12486,5 +12486,7 @@
   "390c8fd5a77078ac": "Yellow star. Change to blue",
   "500de308bbfea78c": "Blue star. Remove star",
   "d119e8cc5f01d5a9": "Couldn't update thread star",
-  "abb2bb2e140299a4": "{color, select, green {Green star} yellow {Yellow star} other {Blue star}}"
+  "abb2bb2e140299a4": "{color, select, green {Green star} yellow {Yellow star} other {Blue star}}",
+  "c59bdf5ee3dbd303": "Add colored stars to threads and filter the sidebar by Starred.",
+  "cdc5a7db2e3647c7": "Thread stars"
 }

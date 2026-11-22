@@ -9,6 +9,7 @@ import { page, userEvent } from "vite-plus/test/browser";
 import { AppRoot } from "~/AppRoot";
 // The thread route loads ChatView lazily; its first transform would eat the test's timeout.
 import "~/components/ChatView";
+import "~/components/settings/LabsSettingsPanel";
 import { __setClientSettingsForTests } from "~/hooks/useSettings";
 import "~/index.css";
 import { getRouter } from "~/router";
@@ -99,6 +100,7 @@ it("cycles thread stars without reranking and finds stars outside the initial sh
   __setClientSettingsForTests({
     ...DEFAULT_CLIENT_SETTINGS,
     priorityInboxEnabled: true,
+    threadStarsEnabled: true,
     sidebarProjectSortOrder: "manual",
     onboardingCompletedAt: "2026-01-01T00:00:00.000Z",
   });
@@ -106,9 +108,8 @@ it("cycles thread stars without reranking and finds stars outside the initial sh
     [Symbol.dispose]: () => __setClientSettingsForTests(DEFAULT_CLIENT_SETTINGS),
   };
   await page.viewport(1400, 900);
-  const router = getRouter(
-    createMemoryHistory({ initialEntries: [`/${ENVIRONMENT_ID}/${review.id}`] }),
-  );
+  const threadPath = `/${ENVIRONMENT_ID}/${review.id}`;
+  const router = getRouter(createMemoryHistory({ initialEntries: [threadPath] }));
   await router.load();
   await using screen = await render(<AppRoot router={router} />, {
     // AppRoot brings its own router.
@@ -202,4 +203,35 @@ it("cycles thread stars without reranking and finds stars outside the initial sh
   await expect
     .element(ordinaryRow.getByRole("button", { name: "Add green star" }))
     .toBeInTheDocument();
+
+  await userEvent.click(starred);
+  const prioritySwitch = page.getByRole("switch", { name: "Priority inbox" });
+  const starsSwitch = page.getByRole("switch", { name: "Thread stars" });
+  await router.navigate({ to: "/settings/labs" });
+  await expect.element(prioritySwitch).toBeChecked();
+  await expect.element(starsSwitch).toBeChecked();
+  await userEvent.click(prioritySwitch);
+  await expect.element(starsSwitch).toBeChecked();
+  await router.navigate({ href: threadPath });
+
+  await expect.element(readFilter).not.toBeInTheDocument();
+  await expect.element(starred).toHaveAttribute("aria-pressed", "true");
+  await expect.element(ordinaryRow).not.toBeInTheDocument();
+  const yellow = rowOf(read).getByRole("button", { name: "Yellow star. Change to blue" });
+  await expect.element(yellow).toBeVisible();
+
+  await router.navigate({ to: "/settings/labs" });
+  await userEvent.click(starsSwitch);
+  await expect.element(starsSwitch).not.toBeChecked();
+  await router.navigate({ href: threadPath });
+  await expect.element(starred).not.toBeInTheDocument();
+  await expect.element(yellow).not.toBeInTheDocument();
+  await expect.element(ordinaryRow).toBeVisible();
+
+  await router.navigate({ to: "/settings/labs" });
+  await userEvent.click(starsSwitch);
+  await expect.element(prioritySwitch).not.toBeChecked();
+  await router.navigate({ href: threadPath });
+  await expect.element(starred).toBeVisible();
+  await expect.element(yellow).toBeVisible();
 });

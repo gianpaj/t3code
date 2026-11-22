@@ -1,0 +1,205 @@
+import { createMemoryHistory } from "@tanstack/react-router";
+import { ProjectId, type ThreadPullRequestLink } from "@t3tools/contracts";
+import { DEFAULT_CLIENT_SETTINGS } from "@t3tools/contracts/settings";
+import type * as Context from "effect/Context";
+import * as DateTime from "effect/DateTime";
+import { expect, it, vi } from "vite-plus/test";
+import { page, userEvent } from "vite-plus/test/browser";
+
+import { AppRoot } from "~/AppRoot";
+// The thread route loads ChatView lazily; its first transform would eat the test's timeout.
+import "~/components/ChatView";
+import { __setClientSettingsForTests } from "~/hooks/useSettings";
+import "~/index.css";
+import { getRouter } from "~/router";
+import {
+  dispatchedCommands,
+  ENVIRONMENT_ID,
+  rejectPendingCommand,
+  installFakeEnvironment,
+  threadWithHistory,
+  type FakeDriver,
+} from "../../test/fakeEnvironment";
+import { render } from "../../test/render";
+
+// The socket is the only fake layer; see test/appScenarios.renders.tsx.
+vi.mock("../../../../packages/client-runtime/src/connection/driver.ts", async (importOriginal) => {
+  const [actual, { fakeDriver }, Layer] = await Promise.all([
+    importOriginal<{ readonly ConnectionDriver: Context.Key<unknown, FakeDriver> }>(),
+    import("../../test/fakeEnvironment"),
+    import("effect/Layer"),
+  ]);
+  return { ...actual, layer: Layer.succeed(actual.ConnectionDriver, fakeDriver) };
+});
+
+vi.mock(import("~/rpc/requestLatencyState"), async (original) => ({
+  ...(await original()),
+  trackRpcRequestSent: () => {},
+}));
+
+it("cycles thread stars without reranking and finds stars outside the initial shell", async () => {
+  const projectId = ProjectId.make("other-project");
+  const at = "2026-03-17T19:12:28.000Z";
+  const review = {
+    ...threadWithHistory("review", 1),
+    starColor: "green",
+    lastVisitedAt: DateTime.makeUnsafe("2026-03-17T19:00:00.000Z"),
+    pullRequests: [
+      {
+        host: "github.com",
+        repository: "example/repo",
+        number: 41,
+        url: "https://github.com/example/repo/pull/41",
+        source: "manual",
+        linkedAt: at,
+        stack: null,
+        snapshot: {
+          state: "open",
+          title: "Review",
+          headBranch: "review",
+          baseBranch: "main",
+          isDraft: true,
+          updatedAt: at,
+          syncedAt: at,
+        },
+      } satisfies ThreadPullRequestLink,
+    ],
+  } as const;
+  const read = { ...threadWithHistory("read-star", 1), projectId, starColor: "yellow" } as const;
+  const ordinary = threadWithHistory("ordinary", 1);
+  const history = {
+    ...threadWithHistory("zz-older-star", 1),
+    projectId,
+    olderSettled: true,
+    starColor: "blue",
+  } as const;
+  const rejected = threadWithHistory("reject-star", 1);
+  using _environment = installFakeEnvironment(
+    [
+      review,
+      read,
+      ordinary,
+      rejected,
+      ...Array.from({ length: 30 }, (_, index) => ({
+        ...threadWithHistory(`older-unstarred-${index}`, 1),
+        projectId,
+        olderSettled: true as const,
+      })),
+      history,
+    ],
+    {
+      threadStars: true,
+      serveOlderSettled: true,
+      acceptCommands: true,
+      extraProjects: [{ id: projectId, title: "Other project" }],
+      holdCommand: (command) =>
+        command.type === "thread.star.set" && command.threadId === rejected.id,
+    },
+  );
+  __setClientSettingsForTests({
+    ...DEFAULT_CLIENT_SETTINGS,
+    priorityInboxEnabled: true,
+    sidebarProjectSortOrder: "manual",
+    onboardingCompletedAt: "2026-01-01T00:00:00.000Z",
+  });
+  using _settings = {
+    [Symbol.dispose]: () => __setClientSettingsForTests(DEFAULT_CLIENT_SETTINGS),
+  };
+  await page.viewport(1400, 900);
+  const router = getRouter(
+    createMemoryHistory({ initialEntries: [`/${ENVIRONMENT_ID}/${review.id}`] }),
+  );
+  await router.load();
+  await using screen = await render(<AppRoot router={router} />, {
+    // AppRoot brings its own router.
+    router: false,
+  });
+
+  const rowOf = ({ id }: { id: string }) =>
+    screen.getByTestId("sidebar-row-card").filter({ hasText: id });
+  const ordinaryRow = rowOf(ordinary);
+  const reviewRow = rowOf(review);
+  const rejectRow = rowOf(rejected);
+  const starred = screen.getByRole("button", { name: "Starred", exact: true });
+  const readFilter = screen.getByRole("button", { name: /^Read filter:/ });
+  const settled = screen.getByRole("button", { name: /^Settled/ });
+  const starsFor = (threadId: typeof ordinary.id) =>
+    dispatchedCommands().flatMap((command) =>
+      command.type === "thread.star.set" && command.threadId === threadId ? [command.color] : [],
+    );
+  const placements = () =>
+    Array.from(screen.container.querySelectorAll('[data-testid="sidebar-row-card"]'), (row) => [
+      row.closest("[data-thread-item]")?.getAttribute("data-thread-item"),
+      row.getAttribute("data-sidebar-parent"),
+    ]);
+
+  await expect.element(ordinaryRow).toBeVisible();
+  await expect.element(reviewRow).toHaveAttribute("data-sidebar-parent", "shelf:priority");
+  await expect.element(ordinaryRow).toHaveAttribute("data-sidebar-parent", "shelf:other");
+  const original = placements();
+  await userEvent.hover(ordinaryRow);
+  const add = ordinaryRow.getByRole("button", { name: "Add green star" });
+  await expect.element(add).toHaveStyle({ opacity: "1" });
+  const snooze = ordinaryRow.getByRole("button", { name: "Snooze thread" });
+  await expect.element(snooze).toBeVisible();
+  expect(add.element().getBoundingClientRect().right).toBeLessThanOrEqual(
+    snooze.element().getBoundingClientRect().left,
+  );
+  await userEvent.click(add);
+  await userEvent.hover(starred);
+  const green = ordinaryRow.getByRole("button", { name: "Green star. Change to yellow" });
+  await expect.element(green).toHaveStyle({ opacity: "1" });
+  await userEvent.click(green);
+  await userEvent.click(ordinaryRow, { button: "right" });
+  await expect.element(page.getByRole("menuitem", { name: "Mark unread" })).toBeVisible();
+  await userEvent.click(page.getByRole("menuitem", { name: "Yellow star. Change to blue" }));
+  await expect
+    .element(ordinaryRow.getByRole("button", { name: "Blue star. Remove star" }))
+    .toBeVisible();
+  await vi.waitFor(() => expect(starsFor(ordinary.id)).toEqual(["green", "yellow", "blue"]));
+  expect(placements()).toEqual(original);
+
+  await userEvent.hover(rejectRow);
+  await userEvent.click(rejectRow.getByRole("button", { name: "Add green star" }));
+  await expect
+    .element(rejectRow.getByRole("button", { name: "Green star. Change to yellow" }))
+    .toBeVisible();
+  await vi.waitFor(() => expect(starsFor(rejected.id)).toEqual(["green"]));
+  await rejectPendingCommand("Star rejected");
+  await expect
+    .element(rejectRow.getByRole("button", { name: "Add green star" }))
+    .toBeInTheDocument();
+
+  await userEvent.click(starred);
+  await expect.element(starred).toHaveAttribute("aria-pressed", "true");
+  await expect.element(reviewRow).toBeVisible();
+  await expect.element(ordinaryRow).toBeVisible();
+  await expect.element(rowOf(read)).toBeVisible();
+  await expect.element(rejectRow).not.toBeInTheDocument();
+  await expect.element(settled).toHaveTextContent("Settled1");
+  await userEvent.click(settled);
+  const older = screen.getByTestId("sidebar-row-slim").filter({ hasText: history.title });
+  await expect.element(older).toBeVisible();
+  await expect.element(older.getByRole("button", { name: "Blue star. Remove star" })).toBeVisible();
+
+  await userEvent.click(screen.getByRole("button", { name: "Other project", exact: true }));
+  await expect.element(older).toBeVisible();
+  await expect.element(ordinaryRow).not.toBeInTheDocument();
+  await expect.element(rowOf(read)).toBeVisible();
+  await userEvent.click(readFilter);
+  await expect.element(rowOf(read)).not.toBeInTheDocument();
+  await expect.element(older).not.toBeInTheDocument();
+  await userEvent.click(readFilter);
+  await expect.element(rowOf(read)).toBeVisible();
+  await userEvent.click(screen.getByRole("button", { name: "Other project", exact: true }));
+
+  const clear = ordinaryRow.getByRole("button", { name: "Blue star. Remove star" });
+  await userEvent.click(clear);
+  await expect.element(ordinaryRow).not.toBeInTheDocument();
+  await expect.element(starred).toHaveFocus();
+  await vi.waitFor(() => expect(starsFor(ordinary.id)).toEqual(["green", "yellow", "blue", null]));
+  await userEvent.click(starred);
+  await expect
+    .element(ordinaryRow.getByRole("button", { name: "Add green star" }))
+    .toBeInTheDocument();
+});

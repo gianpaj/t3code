@@ -23,6 +23,7 @@ export type ThreadActionMenuId =
   | "rename"
   | "regenerate-title"
   | "mark-unread"
+  | "cycle-star"
   | "share-guest"
   | "copy"
   | "copy-path"
@@ -104,6 +105,7 @@ export interface ThreadActionMenuState {
     readonly isActive: boolean;
   } | null;
   readonly isPinned: boolean;
+  readonly starActionLabel?: string | undefined;
   readonly isSettled: boolean;
   readonly autoSettleEnabled: boolean;
   readonly isSnoozed: boolean;
@@ -220,6 +222,9 @@ export function buildThreadActionMenuItems(
         ]
       : []),
     { id: "mark-unread", label: resolve(msg("Mark unread")), icon: "mail-open" },
+    ...(state.starActionLabel === undefined
+      ? []
+      : [{ id: "cycle-star" as const, label: state.starActionLabel, icon: "star" }]),
     ...(state.canShareWithGuest
       ? [{ id: "share-guest" as const, label: resolve(msg("Share with guest")), icon: "user-plus" }]
       : []),

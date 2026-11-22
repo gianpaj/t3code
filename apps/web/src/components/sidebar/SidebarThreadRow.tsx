@@ -1,4 +1,4 @@
-import { useAtomMount } from "@effect/atom-react";
+import { useAtomMount, useAtomValue } from "@effect/atom-react";
 import { asLaunchingThread } from "@t3tools/client-runtime/state/thread-inbox";
 import { ThreadHoverCard, ThreadHoverCardPopup } from "../ThreadHoverCard";
 import { ThreadTerminalStatusButton } from "../ThreadStatusIndicators";
@@ -35,6 +35,7 @@ import {
   type EnvironmentId,
   type EnvironmentMachineKind,
   type ScopedThreadRef,
+  type ThreadStarColor,
 } from "@t3tools/contracts";
 
 import type { TimestampFormat } from "@t3tools/contracts/settings";
@@ -55,6 +56,7 @@ import {
   PinOffIcon,
   ShieldQuestionIcon,
   SquarePenIcon,
+  StarIcon,
   TerminalIcon,
   Undo2Icon,
   UserRoundIcon,
@@ -72,6 +74,7 @@ import {
 import { msg, T, useGT, useMessages, Var } from "gt-react";
 
 import type { MessageResolver } from "../../i18n/messages";
+import { threadStarClassName, threadStarLabel } from "./threadStars";
 
 import { useRightPanelStore } from "../../rightPanelStore";
 import { useOpenPrLink } from "../../lib/openPullRequestLink";
@@ -82,6 +85,7 @@ import { useNowSecond } from "../../hooks/useNowSecond";
 import { vcsEnvironment, vcsBranchRevalidation } from "../../state/vcs";
 import { useSidebarLinkedIssueState } from "../../state/issues";
 import { useEnvironmentQuery } from "../../state/query";
+import { threadEnvironment } from "../../state/threads";
 import { readEnvironmentScope, useEnvironmentScope } from "../../state/session";
 import { formatRelativeTime, parseTimestampDate } from "../../timestampFormat";
 import type { SidebarThreadSummary } from "../../types";
@@ -403,6 +407,68 @@ function SidebarThreadTooltip({
   );
 }
 
+function ThreadStarControl(props: {
+  threadRef: ScopedThreadRef;
+  starColor: ThreadStarColor | null;
+  starSupported: boolean;
+  onCycleStar: (ref: ScopedThreadRef) => void;
+}) {
+  const gt = useGT();
+  const messages = useMessages();
+  const { starColor, threadRef } = props;
+  const canChangeStar = useAtomValue(
+    threadEnvironment.setStar.permissionAtom(props.starSupported ? threadRef.environmentId : null, {
+      type: "thread.star.set",
+    }),
+  );
+  const starIcon = (
+    <StarIcon
+      aria-hidden
+      className={cn(
+        "size-3.5 shrink-0",
+        starColor !== null && ["fill-current", threadStarClassName[starColor]],
+      )}
+    />
+  );
+  const starLabel = canChangeStar ? threadStarLabel(starColor, messages) : undefined;
+  return canChangeStar ? (
+    <Tooltip>
+      <TooltipTrigger
+        render={
+          <button
+            type="button"
+            aria-label={starLabel}
+            onClick={(event) => {
+              event.preventDefault();
+              event.stopPropagation();
+              props.onCycleStar(threadRef);
+            }}
+            onPointerDown={(event) => event.stopPropagation()}
+            className={cn(
+              "inline-flex shrink-0 cursor-pointer items-center rounded-md px-1.5 text-muted-foreground hover:text-foreground focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-ring",
+              starColor === null &&
+                "pointer-events-none absolute left-0 opacity-0 focus-visible:pointer-events-auto focus-visible:static focus-visible:opacity-100 group-any-hover/sidebar-row:pointer-events-auto group-any-hover/sidebar-row:static group-any-hover/sidebar-row:opacity-100",
+            )}
+          />
+        }
+      >
+        {starIcon}
+      </TooltipTrigger>
+      <TooltipPopup side="top">{starLabel}</TooltipPopup>
+    </Tooltip>
+  ) : starColor === null ? null : (
+    <span
+      className="inline-flex shrink-0 items-center px-1.5"
+      role="img"
+      aria-label={gt("{color, select, green {Green star} yellow {Yellow star} other {Blue star}}", {
+        color: starColor,
+      })}
+    >
+      {starIcon}
+    </span>
+  );
+}
+
 function SnoozeMenuButton(props: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -634,6 +700,9 @@ type SidebarThreadRowProps = {
   onUnsettle: (threadRef: ScopedThreadRef) => void;
   onSnooze: (threadRef: ScopedThreadRef, preset: Pick<SnoozePreset, "snoozedUntil">) => void;
   onUnsnooze: (threadRef: ScopedThreadRef) => void;
+  starColor: ThreadStarColor | null;
+  starSupported: boolean;
+  onCycleStar: (threadRef: ScopedThreadRef) => void;
   onUnpin: (threadRef: ScopedThreadRef) => void;
   onAcknowledgeWoke: (threadRef: ScopedThreadRef, visitedAt: string) => void;
   onFileDropThreads?: ((threadRef: ScopedThreadRef, files: File[]) => void) | undefined;
@@ -999,6 +1068,15 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: SidebarThreadRowP
   // Closing here, not just masking, keeps the menu from reopening when the button returns.
   if (snoozeMenuOpenRaw && !showSnoozeButton) setSnoozeMenuOpen(false);
   const snoozeMenuOpen = snoozeMenuOpenRaw && showSnoozeButton;
+  const starControl =
+    props.starSupported || props.starColor !== null ? (
+      <ThreadStarControl
+        threadRef={threadRef}
+        starColor={props.starColor}
+        starSupported={props.starSupported}
+        onCycleStar={props.onCycleStar}
+      />
+    ) : null;
   const jumpHintLabel = snoozeMenuOpen ? null : props.jumpLabel;
   const handlePrClick = (event: ReactMouseEvent<HTMLElement>, targetUrl?: string) => {
     const url = targetUrl ?? pr?.url ?? currentLinkedPr?.url;
@@ -1388,6 +1466,7 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: SidebarThreadRowP
                     jumpHintLabel && JUMP_HINT_SLOT_CLASS_NAME,
                   )}
                 >
+                  {starControl}
                   <span
                     className={cn(
                       "inline-flex justify-end tabular-nums text-secondary-label transition-opacity",
@@ -1584,6 +1663,7 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: SidebarThreadRowP
                     jumpHintLabel && JUMP_HINT_SLOT_CLASS_NAME,
                   )}
                 >
+                  {starControl}
                   <span
                     className={cn(
                       isWokeStatus

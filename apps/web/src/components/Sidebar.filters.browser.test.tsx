@@ -100,6 +100,7 @@ it("gates the Priority inbox and its filters behind the Labs switch", async () =
   const otherHeader = screen.getByTestId("sidebar-other-shelf-toggle");
   const renderProject = screen.getByRole("button", { name: "render", exact: true });
   const readFilter = screen.getByRole("button", { name: /^Read filter:/ });
+  const starredFilter = screen.getByRole("button", { name: "Starred", exact: true });
   const picker = screen.getByRole("combobox", { name: /^Filter threads by project/ });
   const labsSwitch = page.getByRole("switch", { name: "Priority inbox" });
   const activeRows = () => screen.container.querySelectorAll('[data-testid="sidebar-row-card"]');
@@ -115,6 +116,7 @@ it("gates the Priority inbox and its filters behind the Labs switch", async () =
   await expect.element(picker).toBeVisible();
   await vi.waitFor(() => expect(activeRows()).toHaveLength(10));
   await expect.element(readFilter).not.toBeInTheDocument();
+  await expect.element(starredFilter).not.toBeInTheDocument();
   await expect.element(renderProject).not.toBeInTheDocument();
   await expect.element(priorityHeader).not.toBeInTheDocument();
 
@@ -124,6 +126,7 @@ it("gates the Priority inbox and its filters behind the Labs switch", async () =
   await expect.element(labsSwitch).toBeChecked();
   await router.navigate({ href: threadPath });
 
+  await expect.element(starredFilter).toBeVisible();
   await expectPriority(9, 5);
   await expect.element(otherHeader).toHaveTextContent("Everything else1");
   await userEvent.click(renderProject);
@@ -179,6 +182,7 @@ it("gates the Priority inbox and its filters behind the Labs switch", async () =
   await router.navigate({ href: threadPath });
   await expect.element(picker).toBeVisible();
   await expect.element(readFilter).not.toBeInTheDocument();
+  await expect.element(starredFilter).not.toBeInTheDocument();
   await expect.element(priorityHeader).not.toBeInTheDocument();
   await vi.waitFor(() => expect(activeRows()).toHaveLength(10));
 });

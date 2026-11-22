@@ -12479,5 +12479,12 @@
   "27d76249d09eb69f": "Review guide ready",
   "faa3bb26abb39c93": "Review guide failed",
   "b7df38b7d8792d78": "Open guide",
-  "9e91e9a77b664e4e": "Could not start a review guide"
+  "9e91e9a77b664e4e": "Could not start a review guide",
+  "83fdfbe28d405af1": "Starred",
+  "b1c7cf340e782d56": "Add green star",
+  "ef2e0b4acc3f5c11": "Green star. Change to yellow",
+  "390c8fd5a77078ac": "Yellow star. Change to blue",
+  "500de308bbfea78c": "Blue star. Remove star",
+  "d119e8cc5f01d5a9": "Couldn't update thread star",
+  "abb2bb2e140299a4": "{color, select, green {Green star} yellow {Yellow star} other {Blue star}}"
 }

@@ -12470,5 +12470,12 @@
   "27d76249d09eb69f": "Review-Leitfaden bereit",
   "faa3bb26abb39c93": "Review-Leitfaden fehlgeschlagen",
   "b7df38b7d8792d78": "Leitfaden öffnen",
-  "9e91e9a77b664e4e": "Review-Leitfaden konnte nicht gestartet werden"
+  "9e91e9a77b664e4e": "Review-Leitfaden konnte nicht gestartet werden",
+  "83fdfbe28d405af1": "Mit Stern",
+  "b1c7cf340e782d56": "Grünen Stern hinzufügen",
+  "ef2e0b4acc3f5c11": "Grüner Stern. Zu Gelb wechseln",
+  "390c8fd5a77078ac": "Gelber Stern. Zu Blau wechseln",
+  "500de308bbfea78c": "Blauer Stern. Stern entfernen",
+  "d119e8cc5f01d5a9": "Der Stern konnte nicht aktualisiert werden",
+  "abb2bb2e140299a4": "{color, select, green {Grüner Stern} yellow {Gelber Stern} other {Blauer Stern}}"
 }

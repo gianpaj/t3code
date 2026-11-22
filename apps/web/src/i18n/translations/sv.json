@@ -12477,5 +12477,12 @@
   "27d76249d09eb69f": "Granskningsguiden är klar",
   "faa3bb26abb39c93": "Granskningsguiden misslyckades",
   "b7df38b7d8792d78": "Öppna guiden",
-  "9e91e9a77b664e4e": "Kunde inte starta en granskningsguide"
+  "9e91e9a77b664e4e": "Kunde inte starta en granskningsguide",
+  "83fdfbe28d405af1": "Stjärnmärkta",
+  "b1c7cf340e782d56": "Lägg till grön stjärna",
+  "ef2e0b4acc3f5c11": "Grön stjärna. Byt till gul",
+  "390c8fd5a77078ac": "Gul stjärna. Byt till blå",
+  "500de308bbfea78c": "Blå stjärna. Ta bort stjärnan",
+  "d119e8cc5f01d5a9": "Det gick inte att uppdatera trådens stjärna",
+  "abb2bb2e140299a4": "{color, select, green {Grön stjärna} yellow {Gul stjärna} other {Blå stjärna}}"
 }

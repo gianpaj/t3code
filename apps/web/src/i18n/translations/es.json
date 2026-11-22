@@ -12465,5 +12465,12 @@
   "27d76249d09eb69f": "Guía de revisión lista",
   "faa3bb26abb39c93": "Falló la guía de revisión",
   "b7df38b7d8792d78": "Abrir guía",
-  "9e91e9a77b664e4e": "No se pudo iniciar una guía de revisión"
+  "9e91e9a77b664e4e": "No se pudo iniciar una guía de revisión",
+  "83fdfbe28d405af1": "Con estrella",
+  "b1c7cf340e782d56": "Añadir estrella verde",
+  "ef2e0b4acc3f5c11": "Estrella verde. Cambiar a amarilla",
+  "390c8fd5a77078ac": "Estrella amarilla. Cambiar a azul",
+  "500de308bbfea78c": "Estrella azul. Quitar estrella",
+  "d119e8cc5f01d5a9": "No se pudo actualizar la estrella del hilo",
+  "abb2bb2e140299a4": "{color, select, green {Estrella verde} yellow {Estrella amarilla} other {Estrella azul}}"
 }

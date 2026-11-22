@@ -80,6 +80,7 @@ import {
   ListFilterIcon,
   PlusIcon,
   SettingsIcon,
+  StarIcon,
 } from "lucide-react";
 import {
   useEffect,
@@ -264,6 +265,12 @@ import {
 import { SidebarContent, SidebarGroup, SidebarMenuButton, useSidebar } from "./ui/sidebar";
 import { SidebarChromeFooter, SidebarChromeHeader } from "./sidebar/SidebarChrome";
 import { SidebarHeaderIconButton, SidebarThreadHeader } from "./sidebar/SidebarThreadHeader";
+import {
+  threadStarLabel,
+  useThreadStars,
+  visibleThreadStar,
+  type PendingStar,
+} from "./sidebar/threadStars";
 import { TooltipProvider } from "./ui/tooltip";
 import {
   composerDraftHasUserContent,
@@ -440,6 +447,8 @@ function useSidebarThreads(input: {
   readonly projectScopeKey: string | null;
   readonly scopedProjectKeys: ReadonlySet<string> | null;
   readonly readFilter: ThreadReadFilter;
+  readonly starredOnly: boolean;
+  readonly pendingStars: ReadonlyMap<string, PendingStar>;
   readonly showPrioritySections: boolean;
   readonly serverConfigs: ReadonlyMap<EnvironmentId, EnvironmentServerConfig>;
   readonly connectedEnvironmentIds: readonly EnvironmentId[];
@@ -457,6 +466,8 @@ function useSidebarThreads(input: {
     projectScopeKey,
     scopedProjectKeys,
     readFilter,
+    starredOnly,
+    pendingStars,
     showPrioritySections,
     serverConfigs,
     connectedEnvironmentIds,
@@ -504,7 +515,9 @@ function useSidebarThreads(input: {
     true,
     Schema.Boolean,
   );
-  const priorityScope = showPrioritySections ? JSON.stringify([projectScopeKey, readFilter]) : null;
+  const priorityScope = showPrioritySections
+    ? JSON.stringify([projectScopeKey, readFilter, starredOnly])
+    : null;
   const [priorityTail, setPriorityTail] = useState({ scope: priorityScope, showAll: false });
   if (priorityTail.scope !== priorityScope) {
     setPriorityTail({ scope: priorityScope, showAll: false });
@@ -513,15 +526,18 @@ function useSidebarThreads(input: {
   // Shared with the old per-project sidebar, so folders keep their open state.
   const projectExpandedById = useUiStateStore((store) => store.projectExpandedById);
   const setProjectExpanded = useUiStateStore((store) => store.setProjectExpanded);
+  const settledScopeKey = starredOnly
+    ? JSON.stringify([projectScopeKey, "starred"])
+    : projectScopeKey;
   const [settledTail, setSettledTail] = useState({
-    scopeKey: projectScopeKey,
+    scopeKey: settledScopeKey,
     count: SETTLED_TAIL_INITIAL_COUNT,
   });
-  if (settledTail.scopeKey !== projectScopeKey) {
-    setSettledTail({ scopeKey: projectScopeKey, count: SETTLED_TAIL_INITIAL_COUNT });
+  if (settledTail.scopeKey !== settledScopeKey) {
+    setSettledTail({ scopeKey: settledScopeKey, count: SETTLED_TAIL_INITIAL_COUNT });
   }
   const settledVisibleCount =
-    settledTail.scopeKey === projectScopeKey ? settledTail.count : SETTLED_TAIL_INITIAL_COUNT;
+    settledTail.scopeKey === settledScopeKey ? settledTail.count : SETTLED_TAIL_INITIAL_COUNT;
 
   const partition = partitionSidebarThreads({
     threads,
@@ -545,15 +561,20 @@ function useSidebarThreads(input: {
       readFilter,
       thread.lastVisitedAt === undefined ? localThreadVisits?.[threadShellKey(thread)] : undefined,
     );
-  const pinnedThreads = showShelves
-    ? partition.pinnedThreads
-    : partition.pinnedThreads.filter(inReadFilter);
-  const activeThreads = showShelves
-    ? partition.activeThreads
-    : partition.activeThreads.filter(inReadFilter);
-  const workingThreads = showShelves ? partition.workingThreads : EMPTY_THREADS;
-  const snoozedThreads = showShelves ? partition.snoozedThreads : EMPTY_THREADS;
-  const settledThreads = showShelves ? partition.settledThreads : EMPTY_THREADS;
+  const filterThreads = (rows: ReadonlyArray<EnvironmentThreadShell>) =>
+    showShelves && !starredOnly
+      ? rows
+      : rows.filter(
+          (thread) =>
+            (!starredOnly ||
+              visibleThreadStar(thread, pendingStars.get(threadShellKey(thread))) !== null) &&
+            (showShelves || inReadFilter(thread)),
+        );
+  const pinnedThreads = filterThreads(partition.pinnedThreads);
+  const activeThreads = filterThreads(partition.activeThreads);
+  const workingThreads = showShelves ? filterThreads(partition.workingThreads) : EMPTY_THREADS;
+  const snoozedThreads = showShelves ? filterThreads(partition.snoozedThreads) : EMPTY_THREADS;
+  const settledThreads = showShelves ? filterThreads(partition.settledThreads) : EMPTY_THREADS;
   const openBranchPullRequests = useOpenBranchPullRequests(
     showPrioritySections ? activeThreads : EMPTY_THREADS,
   );
@@ -572,7 +593,16 @@ function useSidebarThreads(input: {
     : routeThreadOnly(otherThreads, routeRowThreadKey);
   // Older settled threads load in pages; the shelf lists them only as far as they are loaded.
   const olderSettledShelf = useOlderSettledShelf({
-    scopes: showShelves ? olderSettledScopes([...serverConfigs.keys()], scopedProjectKeys) : [],
+    scopes: showShelves
+      ? olderSettledScopes(
+          [...serverConfigs].flatMap(([environmentId, config]) =>
+            !starredOnly || config.environment.capabilities.threadStars === true
+              ? [environmentId]
+              : [],
+          ),
+          scopedProjectKeys,
+        ).map((scope) => (starredOnly ? { ...scope, starredOnly: true } : scope))
+      : [],
     expanded: showShelves && settledShelfExpanded,
     visibleCount: settledVisibleCount,
   });
@@ -608,7 +638,7 @@ function useSidebarThreads(input: {
       : groupSidebarThreadsByProject(
           folderGroups,
           activeThreads,
-          showShelves ? keepEmpty : () => false,
+          showShelves && !starredOnly ? keepEmpty : () => false,
         ).map((folder) => {
           const collapsed = !resolveProjectExpanded(
             projectExpandedById,
@@ -1127,6 +1157,19 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
   const [threadSearchQuery, setThreadSearchQuery] = useState("");
   const [selectedReadFilter, setReadFilter] = useState<ThreadReadFilter>("all");
   const readFilter = priorityInboxEnabled ? selectedReadFilter : "all";
+  const [starredFilter, setStarredFilter] = useState(false);
+  const starredOnly = priorityInboxEnabled && starredFilter;
+  const starredFilterRef = useRef<HTMLButtonElement>(null);
+  const { pendingStars, cycleStar } = useThreadStars();
+  const starThread = useStableCallback((threadRef: ScopedThreadRef) => {
+    if (
+      priorityInboxEnabled &&
+      serverConfigs.get(threadRef.environmentId)?.environment.capabilities.threadStars === true &&
+      readEnvironmentScope(threadRef.environmentId, AuthOrchestrationOperateScope)
+    ) {
+      void cycleStar(threadRef, starredOnly ? () => starredFilterRef.current?.focus() : undefined);
+    }
+  });
   const [searchHighlightKey, setSearchHighlightKey] = useState<string | null>(null);
   const connectedEnvironmentIds = useConnectedEnvironmentIds();
   const queuePendingFileDrop = useSidebarPendingFileDropStore((s) => s.queuePendingFileDrop);
@@ -1297,6 +1340,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
   const routeDraftIdForRows = routeTarget?.kind === "draft" ? routeTarget.draftId : null;
   const draftTerminalLabels = useDraftTerminalLabels();
   const visibleDraftSessionCount = useComposerDraftStore((store) => {
+    if (starredOnly) return 0;
     let count = 0;
     for (const [draftKey, session] of Object.entries(store.draftThreadsByThreadKey)) {
       if (session.promotedTo != null) {
@@ -1447,6 +1491,8 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
     projectScopeKey,
     scopedProjectKeys,
     readFilter,
+    starredOnly,
+    pendingStars,
     showPrioritySections,
     serverConfigs,
     connectedEnvironmentIds,
@@ -1551,7 +1597,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
   );
   // Draft rows sit above the threads, so jumps and traversal reach them first.
   // Search hides them, so they drop out while it is open.
-  const listedDraftIds = isSearchingThreads ? EMPTY_DRAFT_IDS : draftIds;
+  const listedDraftIds = isSearchingThreads || starredOnly ? EMPTY_DRAFT_IDS : draftIds;
   const draftIdByRowKey = new Map<string, DraftId>(listedDraftIds.map((id) => [`draft:${id}`, id]));
   const orderedRowKeys = [...draftIdByRowKey.keys(), ...orderedThreadKeys];
   const routeDraftRowKey = `draft:${routeDraftIdForRows}`;
@@ -2835,6 +2881,15 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
                     }
                   : null,
               isPinned,
+              starActionLabel:
+                priorityInboxEnabled &&
+                serverConfigs.get(thread.environmentId)?.environment.capabilities.threadStars ===
+                  true
+                  ? threadStarLabel(
+                      visibleThreadStar(thread, pendingStars.get(threadKey)),
+                      messages,
+                    )
+                  : undefined,
               isSettled,
               autoSettleEnabled: thread.autoSettleDisabledAt == null,
               isSnoozed,
@@ -2875,6 +2930,9 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
           return;
         }
         switch (clicked.value) {
+          case "cycle-star":
+            starThread(threadRef);
+            return;
           case "filter-by-project":
             if (threadProjectGroup) {
               setProjectScopeKeys(
@@ -3453,11 +3511,24 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
                     <span>{readFilterLabels[readFilter]}</span>
                   </SidebarMenuButton>
                 </div>
+                <SidebarHeaderIconButton
+                  ref={starredFilterRef}
+                  label={gt("Starred")}
+                  isActive={starredOnly}
+                  aria-pressed={starredOnly}
+                  onClick={() => {
+                    clearSelection();
+                    setStarredFilter(!starredOnly);
+                    scrollSidebarToTop(sidebarContentRef.current);
+                  }}
+                >
+                  <StarIcon className={starredOnly ? "fill-current" : undefined} />
+                </SidebarHeaderIconButton>
                 <div className="flex min-w-0 flex-1 items-center gap-1">
                   {projectShortcuts.map((project) => {
                     const selected = projectScopeKeys.includes(project.projectKey);
                     return (
-                      <div key={project.projectKey}>
+                      <div key={project.projectKey} className="min-w-0">
                         <SidebarMenuButton
                           type="button"
                           size="sm"
@@ -3571,7 +3642,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
             workingThreads.length +
             snoozedThreads.length ===
             0 &&
-          (settledCount === 0 || scopedProjectGroups.length > 0) ? (
+          (settledCount === 0 || (!starredOnly && scopedProjectGroups.length > 0)) ? (
             <div className="flex flex-col items-center gap-2 px-2 py-6 text-center text-xs text-muted-foreground/60">
               {projects.length === 0 ? (
                 <>
@@ -3587,7 +3658,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
                     <T>Add project</T>
                   </button>
                 </>
-              ) : readFilter !== "all" ? (
+              ) : readFilter !== "all" || starredOnly ? (
                 <T>No matching threads.</T>
               ) : scopedProjectGroups.length > 0 ? (
                 <>
@@ -3679,6 +3750,17 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
                               optimisticDrop !== null
                             }
                             thread={thread}
+                            starColor={
+                              priorityInboxEnabled
+                                ? visibleThreadStar(thread, pendingStars.get(threadKey))
+                                : null
+                            }
+                            starSupported={
+                              priorityInboxEnabled &&
+                              serverConfigs.get(thread.environmentId)?.environment.capabilities
+                                .threadStars === true
+                            }
+                            onCycleStar={starThread}
                             variant={rowVariant}
                             navigationParent={
                               folderRow ??
@@ -3777,7 +3859,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
                       const items: ReactNode[] = [
                         <SidebarDraftBlock
                           key="draft-sessions"
-                          draftIds={draftIds}
+                          draftIds={listedDraftIds}
                           routeDraftComposer={routeDraftComposer}
                           terminalLabels={draftTerminalLabels}
                           jumpLabelByDraftId={draftJumpLabelById}

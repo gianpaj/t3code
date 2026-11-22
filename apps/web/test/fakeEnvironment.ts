@@ -25,6 +25,7 @@ import {
   type ModelSelection,
   type OrchestrationProjectShell,
   type OrchestrationV2Command,
+  type OrchestrationV2GetOlderSettledThreadsInput,
   type OrchestrationV2ProjectedTurnItem,
   type OrchestrationV2ProviderThread,
   type OrchestrationV2Run,
@@ -226,6 +227,7 @@ function run(
 
 export interface FakeThread {
   readonly projectId?: ProjectId;
+  readonly starColor?: OrchestrationV2ThreadShell["starColor"];
   readonly pullRequests?: OrchestrationV2ThreadShell["pullRequests"];
   readonly lastVisitedAt?: OrchestrationV2ThreadShell["lastVisitedAt"];
   /** Makes this a side chat of that thread. */
@@ -331,6 +333,7 @@ function shellOf(thread: FakeThread): OrchestrationV2ThreadShell {
     worktreePath: null,
     activeProviderThreadId: thread.providerThreads?.[0]?.id ?? null,
     ...(thread.issues === undefined ? {} : { issues: thread.issues }),
+    ...(thread.starColor === undefined ? {} : { starColor: thread.starColor }),
     ...(thread.pullRequests === undefined ? {} : { pullRequests: thread.pullRequests }),
     lineage: {
       rootThreadId: parentOf(thread) ?? thread.id,
@@ -428,6 +431,17 @@ let shellSubscriber: Queue.Queue<OrchestrationV2ShellStreamItem> | null = null;
 let threads: ReadonlyArray<FakeThread> = [];
 let dispatched: OrchestrationV2Command[] = [];
 let acceptCommands = false;
+let serveOlderSettled = false;
+const OLDER_SETTLED_CUT = "2026-04-01T00:00:00.000Z";
+
+function olderSettledCounts(rows: ReadonlyArray<FakeThread>) {
+  const counts = new Map<ProjectId, number>();
+  for (const row of rows) {
+    const id = row.projectId ?? PROJECT_ID;
+    counts.set(id, (counts.get(id) ?? 0) + 1);
+  }
+  return Array.from(counts, ([projectId, count]) => ({ projectId, count }));
+}
 let projects: ReadonlyArray<OrchestrationProjectShell> = [project];
 let holdCommand: (command: OrchestrationV2Command) => boolean = () => false;
 let pendingDispatches: Array<{
@@ -453,11 +467,25 @@ const subscribe = <A>(first: ReadonlyArray<A>, register?: (queue: Queue.Queue<A>
 
 const handlers: Record<string, (input: never) => unknown> = {
   // Recorded, and accepted only when the scenario asks, since a pending command holds every
-  // later command on its thread. Accepted commands' events never arrive.
+  // later command on its thread. Only commands with fixture handlers emit events.
   [ORCHESTRATION_V2_WS_METHODS.dispatchCommand]: (command: OrchestrationV2Command) =>
     Effect.suspend(() => {
       dispatched.push(command);
       if (acceptCommands && !holdCommand(command)) {
+        if (command.type === "thread.star.set" && shellSubscriber !== null) {
+          const thread = threads.find((candidate) => candidate.id === command.threadId);
+          if (thread !== undefined) {
+            const updated = { ...thread, starColor: command.color };
+            threads = threads.map((candidate) => (candidate === thread ? updated : candidate));
+            sequence += 1;
+            return Queue.offer(shellSubscriber, {
+              kind: "thread.updated",
+              sequence,
+              location: "active",
+              thread: shellOf(updated),
+            }).pipe(Effect.as({ sequence }));
+          }
+        }
         if (command.type !== "thread.fork" || !command.sideChat || shellSubscriber === null)
           return Effect.succeed({ sequence: sequence + 1 });
         const fork: FakeThread = {
@@ -504,6 +532,15 @@ const handlers: Record<string, (input: never) => unknown> = {
             snapshotSequence: sequence,
             projects,
             threads: threads.filter((thread) => !thread.olderSettled).map(shellOf),
+            ...(serveOlderSettled
+              ? {
+                  olderSettled: {
+                    before: OLDER_SETTLED_CUT,
+                    asOfSequence: sequence,
+                    counts: olderSettledCounts(threads.filter((thread) => thread.olderSettled)),
+                  },
+                }
+              : {}),
             archivedThreads: [],
           },
         },
@@ -533,6 +570,30 @@ const handlers: Record<string, (input: never) => unknown> = {
         };
       },
     );
+  },
+  [ORCHESTRATION_V2_WS_METHODS.getOlderSettledThreads]: (
+    input: OrchestrationV2GetOlderSettledThreadsInput,
+  ) => {
+    const settledAt = DateTime.formatIso(AT);
+    const rows = threads.filter(
+      (thread) =>
+        thread.olderSettled &&
+        (!input.starredOnly || thread.starColor != null) &&
+        (input.projectIds === undefined ||
+          input.projectIds.includes(thread.projectId ?? PROJECT_ID)) &&
+        (settledAt < input.before.settledAt ||
+          (settledAt === input.before.settledAt &&
+            input.before.threadId !== undefined &&
+            thread.id > input.before.threadId)),
+    );
+    return Effect.succeed({
+      snapshotSequence: sequence,
+      threads: rows
+        .toSorted((a, b) => a.id.localeCompare(b.id))
+        .slice(0, input.limit)
+        .map(shellOf),
+      counts: input.limit === 0 ? olderSettledCounts(rows) : [],
+    });
   },
   [ORCHESTRATION_V2_WS_METHODS.getThreadFamily]: (input: { readonly threadId: ThreadId }) => {
     const rootOf = (thread: FakeThread) => parentOf(thread) ?? thread.id;
@@ -608,6 +669,8 @@ export function installFakeEnvironment(
   fixtures: ReadonlyArray<FakeThread>,
   options?: {
     readonly acceptCommands?: boolean;
+    readonly threadStars?: boolean;
+    readonly serveOlderSettled?: boolean;
     readonly keybindings?: ResolvedKeybindingsConfig;
     readonly extraProjects?: ReadonlyArray<Pick<OrchestrationProjectShell, "id" | "title">>;
     /** Commands left unanswered even when accepting, until `rejectPendingCommand`. */
@@ -623,6 +686,20 @@ export function installFakeEnvironment(
     ),
     keybindings: options?.keybindings ?? DEFAULT_RESOLVED_KEYBINDINGS,
   };
+  serveOlderSettled = options?.serveOlderSettled === true;
+  if (options?.threadStars || serveOlderSettled) {
+    baseServerConfig = {
+      ...baseServerConfig,
+      ...(serveOlderSettled ? { shellOlderSettled: true, shellThreadFamilies: true } : {}),
+      environment: {
+        ...baseServerConfig.environment,
+        capabilities: {
+          ...baseServerConfig.environment.capabilities,
+          threadStars: options?.threadStars === true,
+        },
+      },
+    };
+  }
   dispatched = [];
   acceptCommands = options?.acceptCommands === true;
   projects = [
@@ -658,6 +735,7 @@ export function installFakeEnvironment(
       baseServerConfig = makeServerConfig([CODEX_PROVIDER]);
       dispatched = [];
       acceptCommands = false;
+      serveOlderSettled = false;
       projects = [project];
       holdCommand = () => false;
       pendingDispatches = [];

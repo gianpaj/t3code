@@ -115,7 +115,7 @@ button:focus-visible,summary:focus-visible,input:focus-visible,.row:focus-visibl
 .provider.claude{color:#d97757}
 .working-glyph,.line-icon{width:16px;height:16px}
 .line-icon{display:inline-block;flex:none;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
-.status-slot{display:grid;height:100%;align-items:center;margin-left:auto}
+.status-slot{display:grid;grid-template-columns:auto auto;height:100%;align-items:center;margin-left:auto}
 .rest-status,.row-actions{grid-area:1 / 1;justify-self:end}
 .rest-status{display:flex;align-items:center}
 .row-actions{display:flex;align-items:center;opacity:0;pointer-events:none;white-space:nowrap}
@@ -123,7 +123,7 @@ button:focus-visible,summary:focus-visible,input:focus-visible,.row:focus-visibl
 .row-actions button:hover,.star-button:hover{color:var(--foreground);background:var(--hover)}
 .row-actions .line-icon,.star-button .line-icon{width:14px;height:14px}
 .row-actions [data-action=snooze] .line-icon{width:12px;height:12px}
-.star-button{flex:none;opacity:0;pointer-events:none;--star-color:currentColor}
+.star-button{grid-area:1 / 2;opacity:0;pointer-events:none;--star-color:currentColor}
 .star-button[data-star=green]{--star-color:light-dark(#15803d,#4ade80)}
 .star-button[data-star=yellow]{--star-color:light-dark(#a16207,#facc15)}
 .star-button[data-star=blue]{--star-color:light-dark(#1d4ed8,#60a5fa)}
@@ -132,7 +132,7 @@ button:focus-visible,summary:focus-visible,input:focus-visible,.row:focus-visibl
 .star-button:not([data-star=off]),
 .star-button:focus-visible,.row[data-show-actions] .star-button,
 .row:has(.status-slot :focus-visible) .row-actions,.row[data-show-actions] .row-actions{opacity:1;pointer-events:auto}
-.row:has(.status-slot :focus-visible) .rest-status,.row[data-show-actions] .rest-status{visibility:hidden}
+.row:has(.row-actions):has(.status-slot :focus-visible) .rest-status,.row:has(.row-actions)[data-show-actions] .rest-status{visibility:hidden}
 @media(any-hover:hover){
   .row:hover .star-button,.row:hover .row-actions{opacity:1;pointer-events:auto}
   .row:has(.row-actions):hover .rest-status{visibility:hidden}
@@ -288,16 +288,17 @@ function row(thread) {
   const classes = "row" + (thread.shelf === "settled" ? " slim" : "") + (thread.unread ? "" : " recede");
   const start = '<li><div role="button" tabindex="0" data-thread="' + thread.id + '" aria-label="' + access + '"' + selected + ' class="' + classes + '">';
   const title = '<span class="title">' + thread.title + '</span>';
-  const leadingIcons = starButton(thread) + project(thread);
   if (thread.shelf === "settled") {
-    return start + leadingIcons + title + status + '</div></li>';
+    return start + project(thread) + title + '<span class="status-slot"><span class="rest-status">' +
+      status + '</span>' + starButton(thread) + '</span></div></li>';
   }
   const actions = thread.shelf === "snoozed"
     ? rowButton("wake", "Wake thread", "clock", "Wake")
-    : rowButton("snooze", "Snooze thread", "clock") + rowButton("settle", "Settle thread", "check", "Settle");
-  return start + '<span class="topline">' + leadingIcons +
+    : rowButton("settle", "Settle thread", "check", "Settle") + rowButton("snooze", "Snooze thread", "clock");
+  return start + '<span class="topline">' + project(thread) +
     '<span class="project-name">' + thread.project + '</span><span class="status-slot">' +
-    '<span class="rest-status">' + status + '</span><span class="row-actions">' + actions + '</span></span></span>' +
+    '<span class="rest-status">' + status + '</span><span class="row-actions">' + actions + '</span>' +
+    starButton(thread) + '</span></span>' +
     title + '<span class="meta"><span class="branch">' + thread.branch + '</span>' + pullRequest(thread) + provider + '</span></div></li>';
 }
 function hasStar(thread) {

@@ -21,7 +21,11 @@ rules in the shared client runtime, and verify each slice before moving on.
 3. **Thread stars.** Add the persisted color, row control, and Starred filter. Verify that every
    color matches the filter, ranking stays the same, and stars on older settled threads appear
    in filtered results.
-4. **Mobile parity.** Apply the shared rules in Home and the workspace sidebar. Verify the
+4. **Replace pins during the Thread stars beta.** Reuse the top shelf for starred active
+   threads. Inherit green from existing pins, preserve their order, and append other starred
+   active threads. Verify that disabling the beta restores the original pins and that explicit
+   colors and cleared stars survive a second enable.
+5. **Mobile parity.** Apply the shared rules in Home and the workspace sidebar. Verify the
    touch controls and that a star set on desktop appears on mobile in the same environment.
 
 Run the full inbox flow on desktop and mobile before shipping. Try the Decisions API after the
@@ -31,9 +35,9 @@ rule-based inbox is usable.
 
 - Split the flat Active list into **Priority** and **Everything else**. Both start expanded,
   show matching counts when collapsed, and use the same header and chevron behavior as
-  **Working** and **Settled**. Remember each section’s expansion on the device. Pinned, Working,
-  Snoozed, and Settled keep their existing roles. The alternate project-folder layout keeps its
-  project grouping.
+  **Working** and **Settled**. Remember each section’s expansion on the device. The top shelf
+  shows Pinned or Starred according to the Thread stars beta. Working, Snoozed, and Settled keep
+  their existing roles. The alternate project-folder layout keeps its project grouping.
 - Show three project shortcuts using the first three available groups in the existing project
   order. Keep all three visible while the engineer selects projects. The far-right searchable
   picker and the shortcuts update one multi-selection. Clearing it restores all projects.
@@ -59,8 +63,9 @@ rule-based inbox is usable.
 - Add nullable `starColor` to thread state and the shell projection in
   [orchestrationV2.ts](../packages/contracts/src/orchestrationV2.ts). Use one absolute-value
   command through the existing orchestration dispatch, following the event and projection path
-  used by thread tags. Keep the color as one typed value so changing it takes one write. Missing
-  fields decode as unstarred. The command has no effects and leaves `updatedAt` and the visit
+  used by thread tags. Keep the color as one typed value so changing it takes one write. Preserve
+  the distinction between a missing field and an explicit clear in every shell projection. The
+  command has no effects and leaves `updatedAt` and the visit
   watermark untouched. [Orchestrator](../apps/server/src/orchestration-v2/Orchestrator.ts) ·
   [Projection store](../apps/server/src/orchestration-v2/ProjectionStore.ts)
 - Persist one star per thread in its owning environment so the engineer sees the same color
@@ -78,6 +83,24 @@ rule-based inbox is usable.
 - Reuse the existing older-Settled query for starred history. Apply the star predicate to its
   page and count so a thread stays findable after it leaves the initial shell window.
   [Older settled queries](../packages/client-runtime/src/state/olderSettledThreads.ts)
+
+## Replace pins during the beta
+
+- With **Thread stars** enabled, inherit green for a pinned thread whose `starColor` is absent.
+  A saved color takes precedence. An explicit `null` suppresses the inherited star and survives
+  another toggle. Use the same rule for row indicators, shelf membership, the Starred filter,
+  and older Settled results.
+- Reuse the Pinned shelf position for **Starred**. Keep still-starred pins in their saved order,
+  then show other starred active threads in the existing active order. Working, Snoozed, and
+  Settled threads remain in their respective sections and can be found with the Starred filter.
+  Use the star controls in place of Pin and Unpin and disable pin drop targets during the trial.
+  Star color has equal weight in Priority Inbox.
+- Leave `pinnedAt` and `pinOrderKey` in place. Disabling the beta shows the saved pins and their
+  order, while star edits persist for the next enable. Pin changes from another client still
+  apply. Existing pins retain their auto-settle protection and new stars follow ordinary
+  settlement rules. With the beta on, settling a legacy pin keeps its saved pin and order so it
+  can appear in Settled with its inherited star. Toggling the beta changes the view without
+  writing thread data.
 
 ## Derive Priority from the active list
 
@@ -108,8 +131,8 @@ rule-based inbox is usable.
 - **Web and desktop.** Extend the existing collapsible section header and list markers. Add both
   toggles to the sidebar expansion key so a click behaves like collapsing Working or Settled.
   Keep row keys stable and use the current quiet shell reads. The priority groups are display
-  sections within Active. Preserve the existing pin and shelf drop actions and the manual order
-  used by the non-inbox arrangement. Thread jumps follow visible rows. Direct navigation from
+  sections within Active. Restore the existing pin actions and manual order when Thread stars
+  is disabled. Thread jumps follow visible rows. Direct navigation from
   history, the palette, and links still reaches a filtered or collapsed thread.
   [Section headers](../apps/web/src/components/sidebar/SidebarListMarkers.tsx) ·
   [Thread row](../apps/web/src/components/sidebar/SidebarThreadRow.tsx) ·

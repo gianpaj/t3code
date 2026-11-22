@@ -20,6 +20,7 @@ export function LabsSettingsPanel() {
   return (
     <SettingsPageContainer>
       <SettingsSection id="beta" title={gt("Beta")}>
+        <PriorityInboxRow />
         <BoringSidebarRow />
         {/* Clerk is only mounted when this build has T3 Connect. */}
         {hasCloudPublicConfig() ? <GuestLinksRowWithSignIn /> : <GuestLinksRow />}
@@ -29,6 +30,28 @@ export function LabsSettingsPanel() {
         <FastWorktreeCheckoutRow />
       </SettingsSection>
     </SettingsPageContainer>
+  );
+}
+
+function PriorityInboxRow() {
+  const searchableSetting = useSearchableSetting();
+  const enabled = useScopedSettings((settings) => settings.priorityInboxEnabled);
+  const updateSettings = useUpdateScopedSettings();
+  const gt = useGT();
+  return (
+    <SettingsRow
+      {...searchableSetting("priority-inbox")}
+      description={gt(
+        "Show priority groups in the flat sidebar, plus project shortcuts and a read filter.",
+      )}
+      control={
+        <Switch
+          checked={enabled}
+          onCheckedChange={(checked) => updateSettings({ priorityInboxEnabled: checked })}
+          aria-label={gt("Priority inbox")}
+        />
+      }
+    />
   );
 }
 

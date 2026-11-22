@@ -9,6 +9,7 @@ import { page, userEvent } from "vite-plus/test/browser";
 import { AppRoot } from "~/AppRoot";
 // The thread route loads ChatView lazily; its first transform would eat the test's timeout.
 import "~/components/ChatView";
+import "~/components/settings/LabsSettingsPanel";
 import { __setClientSettingsForTests } from "~/hooks/useSettings";
 import "~/index.css";
 import { getRouter } from "~/router";
@@ -35,7 +36,7 @@ vi.mock(import("~/rpc/requestLatencyState"), async (original) => ({
   trackRpcRequestSent: () => {},
 }));
 
-it("combines project shortcuts, the project picker, and the read filter before limiting Priority", async () => {
+it("gates the Priority inbox and its filters behind the Labs switch", async () => {
   const projects = ["Alpha", "Build", "Docs"].map((title) => ({
     title,
     id: ProjectId.make(title.toLowerCase()),
@@ -87,9 +88,8 @@ it("combines project shortcuts, the project picker, and the read filter before l
     [Symbol.dispose]: () => __setClientSettingsForTests(DEFAULT_CLIENT_SETTINGS),
   };
   await page.viewport(1400, 900);
-  const router = getRouter(
-    createMemoryHistory({ initialEntries: [`/${ENVIRONMENT_ID}/${ordinary.id}`] }),
-  );
+  const threadPath = `/${ENVIRONMENT_ID}/${ordinary.id}` as const;
+  const router = getRouter(createMemoryHistory({ initialEntries: [threadPath] }));
   await router.load();
   await using screen = await render(<AppRoot router={router} />, {
     // AppRoot brings its own router.
@@ -100,6 +100,9 @@ it("combines project shortcuts, the project picker, and the read filter before l
   const otherHeader = screen.getByTestId("sidebar-other-shelf-toggle");
   const renderProject = screen.getByRole("button", { name: "render", exact: true });
   const readFilter = screen.getByRole("button", { name: /^Read filter:/ });
+  const picker = screen.getByRole("combobox", { name: /^Filter threads by project/ });
+  const labsSwitch = page.getByRole("switch", { name: "Priority inbox" });
+  const activeRows = () => screen.container.querySelectorAll('[data-testid="sidebar-row-card"]');
   const priorityRows = () =>
     screen.container.querySelectorAll(
       '[data-testid="sidebar-row-card"][data-sidebar-parent="shelf:priority"]',
@@ -108,6 +111,18 @@ it("combines project shortcuts, the project picker, and the read filter before l
     await expect.element(priorityHeader).toHaveTextContent(`Priority${count}`);
     await vi.waitFor(() => expect(priorityRows()).toHaveLength(visible));
   };
+
+  await expect.element(picker).toBeVisible();
+  await vi.waitFor(() => expect(activeRows()).toHaveLength(10));
+  await expect.element(readFilter).not.toBeInTheDocument();
+  await expect.element(renderProject).not.toBeInTheDocument();
+  await expect.element(priorityHeader).not.toBeInTheDocument();
+
+  await router.navigate({ to: "/settings/labs" });
+  await expect.element(labsSwitch).not.toBeChecked();
+  await userEvent.click(labsSwitch);
+  await expect.element(labsSwitch).toBeChecked();
+  await router.navigate({ href: threadPath });
 
   await expectPriority(9, 5);
   await expect.element(otherHeader).toHaveTextContent("Everything else1");
@@ -124,7 +139,6 @@ it("combines project shortcuts, the project picker, and the read filter before l
   await userEvent.click(screen.getByRole("button", { name: "Show 1 more", exact: true }));
   await expectPriority(6, 6);
 
-  const picker = screen.getByRole("combobox", { name: /^Filter threads by project/ });
   await userEvent.click(picker);
   const projectSearch = page.getByRole("combobox", { name: "Search projects" });
   await userEvent.fill(projectSearch, "docs");
@@ -155,4 +169,16 @@ it("combines project shortcuts, the project picker, and the read filter before l
   await expectPriority(9, 0);
   await userEvent.click(priorityHeader);
   await expectPriority(9, 5);
+
+  await userEvent.click(readFilter);
+  await expectPriority(8, 5);
+  await router.navigate({ to: "/settings/labs" });
+  await expect.element(labsSwitch).toBeChecked();
+  await userEvent.click(labsSwitch);
+  await expect.element(labsSwitch).not.toBeChecked();
+  await router.navigate({ href: threadPath });
+  await expect.element(picker).toBeVisible();
+  await expect.element(readFilter).not.toBeInTheDocument();
+  await expect.element(priorityHeader).not.toBeInTheDocument();
+  await vi.waitFor(() => expect(activeRows()).toHaveLength(10));
 });

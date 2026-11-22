@@ -499,6 +499,12 @@ export const SETTINGS_SEARCH_ITEMS = [
     searchTerms: [msg("hide fold running monitoring threads inbox sidebar shelf")],
   },
   {
+    id: "priority-inbox",
+    title: msg("Priority inbox"),
+    to: "/settings/labs",
+    searchTerms: [msg("beta sidebar project shortcuts unread read filter")],
+  },
+  {
     id: "boring-sidebar",
     title: msg("Boring sidebar (group by project)"),
     to: "/settings/labs",

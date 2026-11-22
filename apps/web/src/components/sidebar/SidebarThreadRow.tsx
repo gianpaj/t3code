@@ -445,9 +445,9 @@ function ThreadStarControl(props: {
             }}
             onPointerDown={(event) => event.stopPropagation()}
             className={cn(
-              "inline-flex shrink-0 cursor-pointer items-center rounded-md px-1.5 text-muted-foreground hover:text-foreground focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-ring",
+              "inline-flex shrink-0 cursor-pointer items-center self-stretch rounded-md px-1.5 text-muted-foreground hover:text-foreground focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-ring",
               starColor === null &&
-                "pointer-events-none absolute left-0 opacity-0 focus-visible:pointer-events-auto focus-visible:static focus-visible:opacity-100 group-any-hover/sidebar-row:pointer-events-auto group-any-hover/sidebar-row:static group-any-hover/sidebar-row:opacity-100",
+                "pointer-events-none opacity-0 focus-visible:pointer-events-auto focus-visible:opacity-100 group-any-hover/sidebar-row:pointer-events-auto group-any-hover/sidebar-row:opacity-100",
             )}
           />
         }
@@ -1069,7 +1069,9 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: SidebarThreadRowP
   if (snoozeMenuOpenRaw && !showSnoozeButton) setSnoozeMenuOpen(false);
   const snoozeMenuOpen = snoozeMenuOpenRaw && showSnoozeButton;
   const starControl =
-    props.starSupported || props.starColor !== null ? (
+    !props.sortable?.isDragging &&
+    props.sweepAction === null &&
+    (props.starSupported || props.starColor !== null) ? (
       <ThreadStarControl
         threadRef={threadRef}
         starColor={props.starColor}
@@ -1432,6 +1434,7 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: SidebarThreadRowP
           >
             {/* `contents` keeps one-line rows a single flex row. */}
             <div className={multiline ? "flex h-6 min-w-0 items-center gap-2.5" : "contents"}>
+              {starControl}
               {inFolder ? null : (
                 <span
                   className={cn(
@@ -1466,7 +1469,6 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: SidebarThreadRowP
                     jumpHintLabel && JUMP_HINT_SLOT_CLASS_NAME,
                   )}
                 >
-                  {starControl}
                   <span
                     className={cn(
                       "inline-flex justify-end tabular-nums text-secondary-label transition-opacity",
@@ -1637,6 +1639,7 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: SidebarThreadRowP
             )}
           >
             <div className="flex h-5 min-w-0 items-center gap-1.5">
+              {starControl}
               {draftIndicator}
               {props.project ? (
                 <ProjectFavicon project={props.project} className="size-4 shrink-0" />
@@ -1663,7 +1666,6 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: SidebarThreadRowP
                     jumpHintLabel && JUMP_HINT_SLOT_CLASS_NAME,
                   )}
                 >
-                  {starControl}
                   <span
                     className={cn(
                       isWokeStatus

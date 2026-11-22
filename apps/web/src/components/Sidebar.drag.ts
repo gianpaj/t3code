@@ -19,6 +19,12 @@ const isShelfHeader = (item: SidebarListItem | undefined) =>
     item.marker === "snoozed-header" ||
     item.marker === "settled-header");
 
+const isInboxMarker = (item: SidebarListItem) =>
+  item.kind === "marker" &&
+  (item.marker === "priority-header" ||
+    item.marker === "priority-more" ||
+    item.marker === "other-header");
+
 export function restrictBelowSidebarLabel(
   { transform, containerNodeRect, draggingNodeRect }: Parameters<Modifier>[0],
   offset: number,
@@ -175,7 +181,21 @@ export function createSidebarSortingStrategy(input: {
     marker("pinned-header");
     projected.push(...groups.pinned);
     marker("pinned-divider");
-    section("active");
+    if (items.some(isInboxMarker)) {
+      const inbox = items.filter(
+        (item) =>
+          isInboxMarker(item) ||
+          (item.kind === "thread" && item.section === "active" && item.key !== active.key),
+      );
+      if (target.section === "active") {
+        const overPosition = inbox.indexOf(over);
+        const position = overPosition === -1 ? 1 : overPosition + Number(over.kind === "marker");
+        inbox.splice(position, 0, { ...active, section: "active" });
+      }
+      projected.push(...inbox);
+    } else {
+      section("active");
+    }
     if (items.some((item) => item.kind === "marker" && item.marker === "working-header")) {
       marker("working-header");
       projected.push(...groups.working);
@@ -188,8 +208,10 @@ export function createSidebarSortingStrategy(input: {
       marker("snoozed-header");
       projected.push(...groups.snoozed);
     }
-    marker("settled-header");
-    section("settled");
+    if (items.some((item) => item.kind === "marker" && item.marker === "settled-header")) {
+      marker("settled-header");
+      section("settled");
+    }
     const heights = projected.map((item) => {
       const index = indices.get(sidebarListItemId(item));
       const rect = index === undefined ? undefined : rects[index];

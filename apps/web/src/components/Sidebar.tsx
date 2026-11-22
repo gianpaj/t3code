@@ -35,7 +35,9 @@ import {
 import {
   asLaunchingThread,
   createInboxReturnTracker,
+  groupPriorityInbox,
   isThreadWorking,
+  PRIORITY_INBOX_LIMIT,
 } from "@t3tools/client-runtime/state/thread-inbox";
 import { sortSettledThreads } from "@t3tools/client-runtime/state/thread-sort";
 import {
@@ -159,6 +161,7 @@ import { primaryServerKeybindingsAtom } from "../state/server";
 import { environmentProjects } from "../state/projects";
 import { threadEnvironment } from "../state/threads";
 import { useOlderSettledShelf, useOlderSettledShelfGrowth } from "../state/olderSettledShelf";
+import { useOpenBranchPullRequests } from "../state/pullRequests";
 import { useThreadSearch } from "../state/queries";
 import { useOrchestrationCommand } from "../state/use-orchestration-command";
 import { readEnvironmentScope, useEnvironmentScope } from "../state/session";
@@ -191,6 +194,7 @@ import {
   firstValidTimestampMs,
   isSidebarNestedLinkClick,
   isTrailingDoubleClick,
+  orderInboxActiveDrop,
   orderItemsByPreferredIds,
   planSidebarThreadDrop,
   reduceSidebarProjectScopeMenuState,
@@ -283,6 +287,7 @@ import {
 } from "./sidebar/SidebarProjectFolderHeader";
 import {
   SidebarDragBoundary,
+  SidebarPriorityShowMore,
   SidebarSectionHeader,
   SidebarSectionPlaceholder,
 } from "./sidebar/SidebarListMarkers";
@@ -345,6 +350,8 @@ const SETTLED_TAIL_PAGE_COUNT = 25;
 const SETTLED_SHELF_EXPANDED_KEY = "t3code:sidebar:settled-expanded";
 const SNOOZED_SHELF_EXPANDED_KEY = "t3code:sidebar:snoozed-expanded";
 const WORKING_SHELF_EXPANDED_KEY = "t3code:sidebar:working-expanded";
+const PRIORITY_EXPANDED_KEY = "t3code:sidebar:priority-expanded";
+const OTHER_EXPANDED_KEY = "t3code:sidebar:other-expanded";
 
 const inboxReturns = createInboxReturnTracker();
 
@@ -480,6 +487,22 @@ function useSidebarThreads(input: {
     false,
     Schema.Boolean,
   );
+  const [priorityExpanded, setPriorityExpanded] = useLocalStorage(
+    PRIORITY_EXPANDED_KEY,
+    true,
+    Schema.Boolean,
+  );
+  const [otherExpanded, setOtherExpanded] = useLocalStorage(
+    OTHER_EXPANDED_KEY,
+    true,
+    Schema.Boolean,
+  );
+  const priorityScope = projectScopeKey;
+  const [priorityTail, setPriorityTail] = useState({ scope: priorityScope, showAll: false });
+  if (priorityTail.scope !== priorityScope) {
+    setPriorityTail({ scope: priorityScope, showAll: false });
+  }
+  const showAllPriority = priorityTail.scope === priorityScope && priorityTail.showAll;
   // Shared with the old per-project sidebar, so folders keep their open state.
   const projectExpandedById = useUiStateStore((store) => store.projectExpandedById);
   const setProjectExpanded = useUiStateStore((store) => store.setProjectExpanded);
@@ -507,6 +530,23 @@ function useSidebarThreads(input: {
 
   const { pinnedThreads, activeThreads, workingThreads, snoozedThreads, settledThreads } =
     partition;
+  const openBranchPullRequests = useOpenBranchPullRequests(
+    folderGroups === null ? activeThreads : EMPTY_THREADS,
+  );
+  const inbox =
+    folderGroups === null
+      ? groupPriorityInbox(activeThreads, (thread) => openBranchPullRequests.has(thread))
+      : null;
+  const priorityThreads = inbox?.priority ?? EMPTY_THREADS;
+  const otherThreads = inbox?.other ?? EMPTY_THREADS;
+  const visiblePriorityThreads = priorityExpanded
+    ? showAllPriority
+      ? priorityThreads
+      : priorityThreads.slice(0, PRIORITY_INBOX_LIMIT)
+    : routeThreadOnly(priorityThreads, routeRowThreadKey);
+  const visibleOtherThreads = otherExpanded
+    ? otherThreads
+    : routeThreadOnly(otherThreads, routeRowThreadKey);
   // Older settled threads load in pages; the shelf lists them only as far as they are loaded.
   const olderSettledShelf = useOlderSettledShelf({
     scopes: olderSettledScopes([...serverConfigs.keys()], scopedProjectKeys),
@@ -562,7 +602,7 @@ function useSidebarThreads(input: {
   const orderedThreads = [
     ...pinnedThreads,
     ...(projectFolders === null
-      ? activeThreads
+      ? [...visiblePriorityThreads, ...visibleOtherThreads]
       : projectFolders.flatMap((folder) => folder.threads)),
     ...visibleWorkingThreads,
     ...visibleSnoozedThreads,
@@ -582,6 +622,19 @@ function useSidebarThreads(input: {
     ...partition,
     threads,
     workingShelfEnabled,
+    prioritySection: {
+      count: priorityThreads.length,
+      expanded: priorityExpanded,
+      toggle: () => setPriorityExpanded((expanded) => !expanded),
+      visibleThreads: visiblePriorityThreads,
+      showMore: () => setPriorityTail({ scope: priorityScope, showAll: true }),
+    },
+    otherSection: {
+      count: otherThreads.length,
+      expanded: otherExpanded,
+      toggle: () => setOtherExpanded((expanded) => !expanded),
+      visibleThreads: visibleOtherThreads,
+    },
     searchableThreads: [
       ...pinnedThreads,
       ...activeThreads,
@@ -1316,6 +1369,8 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
 
   const {
     workingShelfEnabled,
+    prioritySection,
+    otherSection,
     pinnedThreads,
     draggableThreadKeys,
     activeReorderableThreadKeys,
@@ -1970,6 +2025,8 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
     });
   };
   const hasProjectFolders = projectFolders !== null && projectFolders.length > 0;
+  const visiblePriorityKeys = new Set(prioritySection.visibleThreads.map(threadShellKey));
+  const visibleOtherKeys = new Set(otherSection.visibleThreads.map(threadShellKey));
   const sidebarListItemsFresh = ((): readonly SidebarListItem[] => {
     const rowsOf = (
       list: readonly EnvironmentThreadShell[],
@@ -1995,9 +2052,25 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
     const pinnedRows = rowsOf(pinnedThreads, "pinned");
     items.push(...pinnedRows);
     items.push({ kind: "marker", marker: "pinned-divider" });
-    const activeRows = rowsOf(activeThreads, "active");
     items.push({ kind: "marker", marker: "active-placeholder" });
-    items.push(...activeRows);
+    if (projectFolders !== null) {
+      items.push(...rowsOf(activeThreads, "active"));
+    } else {
+      if (prioritySection.count > 0) {
+        items.push({ kind: "marker", marker: "priority-header" });
+        items.push(...rowsOf(prioritySection.visibleThreads, "active"));
+        if (
+          prioritySection.expanded &&
+          prioritySection.visibleThreads.length < prioritySection.count
+        ) {
+          items.push({ kind: "marker", marker: "priority-more" });
+        }
+      }
+      if (otherSection.count > 0) {
+        items.push({ kind: "marker", marker: "other-header" });
+        items.push(...rowsOf(otherSection.visibleThreads, "active"));
+      }
+    }
     if (workingThreads.length > 0) {
       items.push({ kind: "marker", marker: "working-header" });
       items.push(...rowsOf(visibleWorkingThreads, "working"));
@@ -2070,6 +2143,27 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
     );
   };
   const sortableIds = sidebarListItems.map(sidebarListItemId);
+  const resolveDropTarget = (activeKey: string, overId: string) => {
+    const target = resolveSidebarDropTarget(sidebarListItems, activeKey, overId);
+    if (target?.section !== "active" || workingShelfEnabled || projectFolders !== null) {
+      return target;
+    }
+    const thread = threadByKey.get(activeKey);
+    if (thread === undefined) return null;
+    const isPriority =
+      visiblePriorityKeys.has(activeKey) ||
+      (!visibleOtherKeys.has(activeKey) &&
+        groupPriorityInbox([thread], () => false).priority.length > 0);
+    return {
+      ...target,
+      activeOrder: orderInboxActiveDrop({
+        activeKey,
+        fullOrder: activeKeys,
+        dropOrder: target.activeOrder,
+        visibleGroupKeys: isPriority ? visiblePriorityKeys : visibleOtherKeys,
+      }),
+    };
+  };
   // Keep non-drag orders constant to preserve sorting strategy and row identity during streaming.
   const { settledOrder: draggedSettledOrder, activeOrder: draggedActiveOrder } =
     dragState === null
@@ -2102,7 +2196,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
     if (source === undefined) return createSidebarCollisionDetection(() => false);
     return createSidebarCollisionDetection(
       (id) => {
-        const target = resolveSidebarDropTarget(sidebarListItems, draggedThreadKey, id);
+        const target = resolveDropTarget(draggedThreadKey, id);
         if (target === null) return false;
         return (
           planSidebarThreadDrop({
@@ -2132,10 +2226,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
     if (projectFolders !== null) return;
     const activeKey = String(event.active.id);
     const activeSection = sectionByThreadKey.get(activeKey);
-    const target =
-      event.over === null
-        ? null
-        : resolveSidebarDropTarget(sidebarListItems, activeKey, String(event.over.id));
+    const target = event.over === null ? null : resolveDropTarget(activeKey, String(event.over.id));
     const activeThread = threadByKey.get(activeKey);
     if (activeSection === undefined || target === null || activeThread === undefined) return;
     const threadRef = scopeThreadRef(activeThread.environmentId, activeThread.id);
@@ -2165,15 +2256,13 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
         : plan.kind === "reorder-pinned" || plan.kind === "move-active"
           ? plan.assignments
           : [];
-    if (
-      !checkThreadOperations(
-        [activeKey, ...assignments.map(({ id }) => id)].flatMap((key) => {
-          const thread = threadByKey.get(key);
-          return thread ? [thread] : [];
-        }),
-      )
-    )
-      return;
+    const assignmentThreads = [activeKey, ...assignments.map(({ id }) => id)].flatMap((key) => {
+      const ref = parseScopedThreadKey(key);
+      const thread = threadByKey.get(key) ?? (ref === null ? null : readThreadShell(ref));
+      return thread === null ? [] : [[key, thread] as const];
+    });
+    if (!checkThreadOperations(assignmentThreads.map(([, thread]) => thread))) return;
+    const assignmentThreadsByKey = new Map(assignmentThreads);
     const drop = {
       key: activeKey,
       sourceSection: activeSection,
@@ -2255,7 +2344,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
       }
       const keyWrites = plan.kind === "pin" ? plan.extraAssignments : plan.assignments;
       for (const assignment of keyWrites) {
-        const thread = threadByKey.get(assignment.id);
+        const thread = assignmentThreadsByKey.get(assignment.id);
         if (thread === undefined) continue;
         if (
           !(await run(
@@ -3496,11 +3585,15 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
                             variant={rowVariant}
                             navigationParent={
                               folderRow ??
-                              (section === "working" ||
-                              section === "snoozed" ||
-                              section === "settled"
-                                ? `shelf:${section}`
-                                : undefined)
+                              (section === "active"
+                                ? visiblePriorityKeys.has(threadKey)
+                                  ? "shelf:priority"
+                                  : "shelf:other"
+                                : section === "working" ||
+                                    section === "snoozed" ||
+                                    section === "settled"
+                                  ? `shelf:${section}`
+                                  : undefined)
                             }
                             variantAction={
                               section === "snoozed"
@@ -3668,6 +3761,40 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
                                       dragTargetSection !== "active"))
                                 }
                                 isDropTarget={dragTargetSection === "active"}
+                              />,
+                            );
+                            break;
+                          case "priority-header":
+                          case "other-header": {
+                            const priority = item.marker === "priority-header";
+                            const section = priority ? prioritySection : otherSection;
+                            items.push(
+                              <SidebarSectionHeader
+                                key={item.marker}
+                                marker={item.marker}
+                                label={
+                                  priority
+                                    ? gt("Priority", { $context: "sidebar section" })
+                                    : gt("Everything else", { $context: "sidebar section" })
+                                }
+                                count={section.count}
+                                toggle={{ expanded: section.expanded, onToggle: section.toggle }}
+                              />,
+                            );
+                            break;
+                          }
+                          case "priority-more":
+                            items.push(
+                              <SidebarPriorityShowMore
+                                key={item.marker}
+                                label={gt(
+                                  "{count, plural, one {Show {count} more} other {Show {count} more}}",
+                                  {
+                                    count:
+                                      prioritySection.count - prioritySection.visibleThreads.length,
+                                  },
+                                )}
+                                onClick={prioritySection.showMore}
                               />,
                             );
                             break;

@@ -1,8 +1,15 @@
-import { EnvironmentId, ProviderInstanceId, RunId, ThreadId } from "@t3tools/contracts";
+import {
+  EnvironmentId,
+  ProviderInstanceId,
+  RunId,
+  ThreadId,
+  type ThreadPullRequestLink,
+} from "@t3tools/contracts";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vite-plus/test";
 
 import {
   createInboxReturnTracker,
+  groupPriorityInbox,
   isThreadWorking,
   sortInboxThreadsByReturn,
   sortWorkingThreadsBySend,
@@ -33,6 +40,48 @@ function thread(id: string, working: boolean) {
       : null,
   };
 }
+
+it("keeps an open draft in Priority and orders pending requests first", () => {
+  const completedAt = "2026-06-01T00:10:00.000Z";
+  const draft: ThreadPullRequestLink = {
+    host: "github.com",
+    repository: "example/repo",
+    url: "https://github.com/example/repo/pull/1",
+    number: 1,
+    source: "manual",
+    linkedAt: completedAt,
+    stack: null,
+    snapshot: {
+      state: "open",
+      isDraft: true,
+      title: "Draft",
+      headBranch: "draft",
+      baseBranch: "main",
+      updatedAt: completedAt,
+      syncedAt: completedAt,
+    },
+  };
+  const review = {
+    ...thread("review", false),
+    pullRequests: [draft],
+  };
+  const question = { ...thread("question", false), hasPendingUserInput: true, pullRequests: [] };
+  const merged = {
+    ...review,
+    id: ThreadId.make("merged"),
+    pullRequests: [{ ...draft, snapshot: { ...draft.snapshot!, state: "merged" as const } }],
+  };
+  const unknown = {
+    ...review,
+    id: ThreadId.make("unknown"),
+    pullRequests: [{ ...draft, snapshot: null }],
+  };
+
+  expect(groupPriorityInbox([review, merged, question, unknown], () => false)).toEqual({
+    priority: [question, review],
+    other: [merged, unknown],
+  });
+});
 
 describe("createInboxReturnTracker", () => {
   beforeEach(() => {

@@ -61,6 +61,12 @@ in a new thread's model picker to add or remove them. A regular click returns to
 single model. Choose a base branch and send. Each selection starts a separate thread
 and worktree while you stay in the new thread composer. This requires a Git project.
 
+## Priority inbox
+
+**Priority** contains active threads with an approval, a question, or a known open
+pull request. Draft pull requests qualify. **Show more** reveals the matching threads
+beyond the first five. You can collapse Priority and **Everything else** independently.
+
 ## Pin and reorder threads
 
 Pin a thread from its menu to keep it above your active work.
@@ -98,9 +104,9 @@ edge to pin a thread. Section labels stay readable for the whole drag, and the s
 thread is over takes the accent color. Section labels also
 identify empty sections and a collapsed settled shelf.
 
-Drag within the pinned or active section to change its order. Other rows slide aside to show the
-spot where the thread will land. Drops into either section keep the position you choose. On
-mobile, open a thread's menu and choose **Arrange threads**. Drag a handle within or between
+On web and desktop, drag within the pinned section to reorder it. When the Working section
+is off, drag to reorder threads within Priority or Everything else. On mobile, open a thread's
+menu and choose **Arrange threads**. Drag a handle within or between
 **Pinned** and **Active** to reorder, pin, or unpin. Drop onto the **Settled** divider to
 settle a thread. The dragged card shows the action before you release it. Expand **Snoozed**
 or **Settled** to drag a parked thread back into either live section. Each drop saves; close the sheet to return to the thread list.
@@ -140,7 +146,7 @@ Threads that are working or waiting on work they will resume from move into a co
 **Working** section below the active list.
 That includes subagents, watched pull requests with checks still running, Claude monitors,
 and background commands or other monitors the agent says it is waiting on. A dev server or other process an agent leaves running does not keep a thread
-there. A thread returns to the top of the active list when it finishes, fails, or needs an approval or
+there. A thread returns to active work when it finishes, fails, or needs an approval or
 answer. The Working section lists the thread you last sent work to first. Pinned threads stay in
 the pinned section.
 

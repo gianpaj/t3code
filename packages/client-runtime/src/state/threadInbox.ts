@@ -3,6 +3,37 @@ import { threadRuntimeIsActive, type EnvironmentThreadShell } from "./models.ts"
 import { toSortableTimestamp } from "./threadSort.ts";
 import { effectiveSnoozed } from "./threadSettled.ts";
 
+type PriorityThreadInput = Pick<
+  EnvironmentThreadShell,
+  "hasPendingApprovals" | "hasPendingUserInput" | "pendingSubagentRequest" | "pullRequests"
+>;
+
+export const PRIORITY_INBOX_LIMIT = 5;
+
+export function groupPriorityInbox<T extends PriorityThreadInput>(
+  threads: readonly T[],
+  hasOpenBranchPullRequest: (thread: T) => boolean,
+) {
+  const requests: T[] = [];
+  const pullRequests: T[] = [];
+  const other: T[] = [];
+  for (const thread of threads) {
+    if (thread.hasPendingApprovals || thread.hasPendingUserInput || thread.pendingSubagentRequest) {
+      requests.push(thread);
+    } else if (
+      thread.pullRequests.some(
+        (link) => link.source !== "stack-dismissed" && link.snapshot?.state === "open",
+      ) ||
+      hasOpenBranchPullRequest(thread)
+    ) {
+      pullRequests.push(thread);
+    } else {
+      other.push(thread);
+    }
+  }
+  return { priority: [...requests, ...pullRequests], other };
+}
+
 type WorkingThreadInput = Pick<
   EnvironmentThreadShell,
   | "hasActionableProposedPlan"

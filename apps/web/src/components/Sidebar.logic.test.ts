@@ -12,6 +12,7 @@ import {
   deleteSelectedThreadEntries,
   getFallbackThreadIdAfterDelete,
   hasUnseenCompletion,
+  orderInboxActiveDrop,
   orderItemsByPreferredIds,
   pinOrderKeyBetween,
   resolveSidebarSweepKeys,
@@ -1201,6 +1202,18 @@ describe("Working shelf (beta)", () => {
         activeOrder: ["a1", "a2", "p1"],
       });
       expect(resolveSidebarDropVerb("active", "working")).toBeNull();
+    });
+
+    it("keeps filtered and capped rows in the saved order when reordering within Priority", () => {
+      const fullOrder = ["first", "other", "second", "hidden"];
+      expect(
+        orderInboxActiveDrop({
+          activeKey: "second",
+          fullOrder,
+          dropOrder: ["second", "first", "other"],
+          visibleGroupKeys: new Set(["first", "second"]),
+        }),
+      ).toEqual(["second", "first", "other", "hidden"]);
     });
 
     it.each([

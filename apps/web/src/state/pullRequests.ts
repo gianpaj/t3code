@@ -1,4 +1,5 @@
 import { useAtomValue } from "@effect/atom-react";
+import type { EnvironmentThreadShell } from "@t3tools/client-runtime/state/models";
 import { sourceControlClients } from "@t3tools/client-runtime/source-control-clients";
 import {
   applyPullRequestSummaryEdits,
@@ -567,6 +568,33 @@ export function observedPullRequestTitle(
     registry.get(pullRequestObservationsAtom(pullRequestSummaryKey(environmentId, reference)))
       .metadata?.summary.title ?? null
   );
+}
+
+// Reuse summaries requested by existing rows and PR views without fetching for hidden threads.
+export function useOpenBranchPullRequests(threads: readonly EnvironmentThreadShell[]) {
+  const atom = Atom.make((get) => {
+    const open = new Set<EnvironmentThreadShell>();
+    for (const thread of threads) {
+      const reference = thread.branchPullRequest;
+      if (
+        reference == null ||
+        thread.pullRequests.some((link) => link.source !== "stack-dismissed")
+      ) {
+        continue;
+      }
+      const key = pullRequestSummaryKey(thread.environmentId, reference);
+      if (get(pullRequestObservationsAtom(key)).metadata?.summary.state === "open") {
+        open.add(thread);
+      }
+    }
+    return open;
+  }).pipe(
+    Atom.withEquality<Set<EnvironmentThreadShell>>(
+      (previous, next) =>
+        previous.size === next.size && [...previous].every((thread) => next.has(thread)),
+    ),
+  );
+  return useAtomValue(atom);
 }
 
 /** The newest of every list, detail, checks and linked-summary answer and the thread's saved link. */

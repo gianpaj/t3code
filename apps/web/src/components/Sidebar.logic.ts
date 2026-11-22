@@ -218,6 +218,9 @@ export type SidebarListMarker =
   | "active-placeholder"
   | "settled-placeholder"
   | "pinned-divider"
+  | "priority-header"
+  | "priority-more"
+  | "other-header"
   | "working-header"
   | "snoozed-header"
   | "settled-header";
@@ -281,6 +284,38 @@ export function resolveSidebarDropTarget(
     else activeOrder.push(item.key);
   }
   return { section, pinnedOrder, activeOrder };
+}
+
+export function orderInboxActiveDrop(input: {
+  readonly activeKey: string;
+  readonly fullOrder: readonly string[];
+  readonly dropOrder: readonly string[];
+  readonly visibleGroupKeys: ReadonlySet<string>;
+}): readonly string[] {
+  const { activeKey, fullOrder, dropOrder, visibleGroupKeys } = input;
+  const matchingOrder = fullOrder.filter((key) => visibleGroupKeys.has(key));
+  const matchingDropOrder = dropOrder.filter(
+    (key) => key === activeKey || visibleGroupKeys.has(key),
+  );
+  if (
+    matchingDropOrder.length === matchingOrder.length &&
+    matchingDropOrder.every((key, index) => key === matchingOrder[index])
+  ) {
+    return fullOrder;
+  }
+
+  const movedIndex = matchingDropOrder.indexOf(activeKey);
+  const nextKey = matchingDropOrder[movedIndex + 1];
+  const previousKey = matchingDropOrder[movedIndex - 1];
+  const order = fullOrder.filter((key) => key !== activeKey);
+  const index =
+    nextKey !== undefined
+      ? order.indexOf(nextKey)
+      : previousKey !== undefined
+        ? order.indexOf(previousKey) + 1
+        : order.length;
+  order.splice(index, 0, activeKey);
+  return order;
 }
 
 type SidebarThreadDropPlan =

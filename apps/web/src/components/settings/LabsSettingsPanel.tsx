@@ -64,7 +64,9 @@ function ThreadStarsRow() {
   return (
     <SettingsRow
       {...searchableSetting("thread-stars")}
-      description={gt("Add colored stars to threads and filter the sidebar by Starred.")}
+      description={gt(
+        "Try colored stars in place of pins. Your pinned threads return when you turn this off.",
+      )}
       control={
         <Switch
           checked={enabled}

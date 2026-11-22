@@ -1,9 +1,15 @@
 import { scopedThreadKey } from "@t3tools/client-runtime/environment";
 import type { EnvironmentThreadShell } from "@t3tools/client-runtime/state/models";
-import { CommandId, type ScopedThreadRef, type ThreadStarColor } from "@t3tools/contracts";
+import {
+  CommandId,
+  resolveThreadStar,
+  type ScopedThreadRef,
+  type ThreadStarColor,
+} from "@t3tools/contracts";
+import { useAtomValue } from "@effect/atom-react";
 import * as Option from "effect/Option";
+import { Atom } from "effect/reactivity";
 import { msg, useGT } from "gt-react";
-import { useRef, useState } from "react";
 
 import { useStableCallback } from "../../hooks/useStableCallback";
 import { m, type MessageResolver } from "../../i18n/messages";
@@ -40,28 +46,32 @@ export interface PendingStar {
   readonly color: ThreadStarColor | null;
 }
 
+const pendingStarsAtom = Atom.make<ReadonlyMap<string, PendingStar>>(new Map()).pipe(
+  Atom.keepAlive,
+);
+
 export function visibleThreadStar(
   thread: EnvironmentThreadShell,
   pending: PendingStar | undefined,
 ) {
-  return pending === undefined ? (thread.source.starColor ?? null) : pending.color;
+  return pending === undefined ? resolveThreadStar(thread.source) : pending.color;
 }
 
 export function useThreadStars() {
   const gt = useGT();
   const setStar = useAtomCommand(threadEnvironment.setStar, { reportFailure: false });
-  const pending = useRef(new Map<string, PendingStar>());
-  const [pendingStars, publish] = useState<ReadonlyMap<string, PendingStar>>(() => new Map());
+  const pendingStars = useAtomValue(pendingStarsAtom);
 
   const cycleStar = useStableCallback(async (ref: ScopedThreadRef, onClear?: () => void) => {
     const key = scopedThreadKey(ref);
     const thread = readThreadShell(ref);
     if (thread === null) return;
-    const color = visibleThreadStar(thread, pending.current.get(key));
+    const pending = new Map(appAtomRegistry.get(pendingStarsAtom));
+    const color = visibleThreadStar(thread, pending.get(key));
     const update = { color: color === null ? "green" : nextColor[color] } satisfies PendingStar;
     if (update.color === null) onClear?.();
-    pending.current.set(key, update);
-    publish(new Map(pending.current));
+    pending.set(key, update);
+    appAtomRegistry.set(pendingStarsAtom, pending);
 
     const result = await setStar({
       environmentId: ref.environmentId,
@@ -72,7 +82,7 @@ export function useThreadStars() {
         color: update.color,
       },
     });
-    if (pending.current.get(key) !== update) return;
+    if (appAtomRegistry.get(pendingStarsAtom).get(key) !== update) return;
     if (result._tag === "Success") {
       await waitForAtomValue({
         registry: appAtomRegistry,
@@ -84,9 +94,11 @@ export function useThreadStars() {
     } else {
       stackedThreadToast({ type: "error", title: gt("Couldn't update thread star") });
     }
-    if (pending.current.get(key) === update) {
-      pending.current.delete(key);
-      publish(new Map(pending.current));
+    const latest = appAtomRegistry.get(pendingStarsAtom);
+    if (latest.get(key) === update) {
+      const remaining = new Map(latest);
+      remaining.delete(key);
+      appAtomRegistry.set(pendingStarsAtom, remaining);
     }
   });
 

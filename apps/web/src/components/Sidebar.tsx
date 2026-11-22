@@ -385,6 +385,8 @@ interface SidebarThreadPartitionInput {
   readonly connectedEnvironmentIds: readonly EnvironmentId[];
   readonly optimisticDrop: SidebarOptimisticDrop | null;
   readonly workingShelfEnabled: boolean;
+  readonly threadStarsEnabled: boolean;
+  readonly pendingStars: ReadonlyMap<string, PendingStar>;
   /** Boring mode: folders list active threads by the user's latest message. */
   readonly sortActiveBySend: boolean;
   // Snooze wakes, the queued-turn grace and the Working shelf's exit grace depend
@@ -448,6 +450,7 @@ function useSidebarThreads(input: {
   readonly scopedProjectKeys: ReadonlySet<string> | null;
   readonly readFilter: ThreadReadFilter;
   readonly starredOnly: boolean;
+  readonly threadStarsEnabled: boolean;
   readonly pendingStars: ReadonlyMap<string, PendingStar>;
   readonly showPrioritySections: boolean;
   readonly serverConfigs: ReadonlyMap<EnvironmentId, EnvironmentServerConfig>;
@@ -467,6 +470,7 @@ function useSidebarThreads(input: {
     scopedProjectKeys,
     readFilter,
     starredOnly,
+    threadStarsEnabled,
     pendingStars,
     showPrioritySections,
     serverConfigs,
@@ -547,6 +551,8 @@ function useSidebarThreads(input: {
     connectedEnvironmentIds,
     optimisticDrop,
     workingShelfEnabled,
+    threadStarsEnabled,
+    pendingStars,
     sortActiveBySend: folderGroups !== null,
     clockKey: `${nowMinute}:${snoozeWakeClock}:${inboxReturnsVersion}`,
   });
@@ -754,6 +760,8 @@ function partitionSidebarThreads(input: SidebarThreadPartitionInput) {
     serverConfigs,
     optimisticDrop,
     workingShelfEnabled,
+    threadStarsEnabled,
+    pendingStars,
     sortActiveBySend,
   } = input;
   const preciseNow = new Date().toISOString();
@@ -761,6 +769,7 @@ function partitionSidebarThreads(input: SidebarThreadPartitionInput) {
   const inboxObservation = inboxReturns.observe(workingShelfEnabled ? threads : null);
   const pinned: EnvironmentThreadShell[] = [];
   const active: EnvironmentThreadShell[] = [];
+  const starred: EnvironmentThreadShell[] = [];
   const working: EnvironmentThreadShell[] = [];
   const inbox = (thread: EnvironmentThreadShell, manuallyMoved = false) =>
     workingShelfEnabled &&
@@ -798,7 +807,9 @@ function partitionSidebarThreads(input: SidebarThreadPartitionInput) {
       const section = resolveSidebarThreadSection({
         snoozed: configLoaded && effectiveSnoozed(thread, { now: preciseNow }),
         settled: configLoaded && thread.settledOverride === "settled",
-        pinned: thread.pinnedAt != null,
+        pinned:
+          thread.pinnedAt != null &&
+          (!threadStarsEnabled || visibleThreadStar(thread, pendingStars.get(threadKey)) !== null),
       });
       (section === "snoozed"
         ? snoozed
@@ -817,10 +828,18 @@ function partitionSidebarThreads(input: SidebarThreadPartitionInput) {
     : workingShelfEnabled
       ? sortInboxThreadsByReturn(active, inboxObservation.returnedAt)
       : sortThreadsForSidebar(active);
+  const activeWithoutStars = threadStarsEnabled
+    ? sortedActive.filter((thread) => {
+        if (visibleThreadStar(thread, pendingStars.get(threadShellKey(thread))) === null)
+          return true;
+        starred.push(thread);
+        return false;
+      })
+    : sortedActive;
   return {
     pinnedThreads:
       optimisticDrop?.section !== "pinned" || optimisticDrop.order === null
-        ? sortedPinned
+        ? [...sortedPinned, ...starred]
         : orderItemsByPreferredIds({
             items: sortedPinned,
             preferredIds: optimisticDrop.order,
@@ -830,9 +849,9 @@ function partitionSidebarThreads(input: SidebarThreadPartitionInput) {
     activeReorderableThreadKeys,
     activeThreads:
       optimisticDrop?.section !== "active" || optimisticDrop.order === null
-        ? sortedActive
+        ? activeWithoutStars
         : orderItemsByPreferredIds({
-            items: sortedActive,
+            items: activeWithoutStars,
             preferredIds: optimisticDrop.order,
             getId: (thread) => scopedThreadKey(scopeThreadRef(thread.environmentId, thread.id)),
           }),
@@ -1493,6 +1512,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
     scopedProjectKeys,
     readFilter,
     starredOnly,
+    threadStarsEnabled,
     pendingStars,
     showPrioritySections,
     serverConfigs,
@@ -2135,7 +2155,9 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
     ) {
       return [];
     }
-    const items: SidebarListItem[] = [{ kind: "marker", marker: "pinned-header" }];
+    const items: SidebarListItem[] = [];
+    if (!threadStarsEnabled) items.push({ kind: "marker", marker: "pinned-header" });
+    else if (pinnedThreads.length > 0) items.push({ kind: "marker", marker: "starred-header" });
     const pinnedRows = rowsOf(pinnedThreads, "pinned");
     items.push(...pinnedRows);
     items.push({ kind: "marker", marker: "pinned-divider" });
@@ -2233,6 +2255,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
   const sortableIds = sidebarListItems.map(sidebarListItemId);
   const resolveDropTarget = (activeKey: string, overId: string) => {
     const target = resolveSidebarDropTarget(sidebarListItems, activeKey, overId);
+    if (threadStarsEnabled && target?.section === "pinned") return null;
     if (target?.section !== "active" || workingShelfEnabled || !showPrioritySections) {
       return target;
     }
@@ -2539,9 +2562,11 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
         supportedCount: titleRegenerationThreads.length,
         actionableCount: regeneratableTitleThreads.length,
       });
-      const pinnedSelectedThreads = selectedThreads.filter(
-        (thread) => serverConfigs.has(thread.environmentId) && thread.pinnedAt != null,
-      );
+      const pinnedSelectedThreads = threadStarsEnabled
+        ? []
+        : selectedThreads.filter(
+            (thread) => serverConfigs.has(thread.environmentId) && thread.pinnedAt != null,
+          );
       const unpinMenuItem = buildBulkUnpinContextMenuItem({
         pinnedCount: pinnedSelectedThreads.length,
       });
@@ -2906,7 +2931,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
                 settlement: configLoaded,
                 autoSettleOptOut: supportsAutoSettleOptOut,
                 snooze: configLoaded,
-                pinning: configLoaded,
+                pinning: configLoaded && !threadStarsEnabled,
                 titleRegeneration: configLoaded,
               },
               snoozePresets,
@@ -3758,7 +3783,9 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
                             sortableDisabled={
                               renamingThreadKey === threadKey ||
                               !draggableThreadKeys.has(threadKey) ||
-                              optimisticDrop !== null
+                              optimisticDrop !== null ||
+                              (threadStarsEnabled &&
+                                (section === "pinned" || thread.pinnedAt != null))
                             }
                             thread={thread}
                             starColor={
@@ -3794,8 +3821,10 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
                             }
                             settlementSupported={serverConfigs.has(thread.environmentId)}
                             snoozeSupported={serverConfigs.has(thread.environmentId)}
-                            pinningSupported={serverConfigs.has(thread.environmentId)}
-                            isPinned={thread.pinnedAt != null}
+                            pinningSupported={
+                              !threadStarsEnabled && serverConfigs.has(thread.environmentId)
+                            }
+                            isPinned={!threadStarsEnabled && thread.pinnedAt != null}
                             dropVerb={
                               dragState?.activeKey === threadKey
                                 ? resolveSidebarDropVerb(dragState.activeSection, dragTargetSection)
@@ -3914,6 +3943,15 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
                           continue;
                         }
                         switch (item.marker) {
+                          case "starred-header":
+                            items.push(
+                              <li key={item.marker}>
+                                <h2 className="px-2 pt-2 pb-1 text-xs font-medium text-sidebar-muted-foreground">
+                                  {gt("Starred")}
+                                </h2>
+                              </li>,
+                            );
+                            break;
                           case "pinned-header":
                             items.push(
                               <SidebarDragBoundary

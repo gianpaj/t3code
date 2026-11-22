@@ -8772,7 +8772,7 @@
   "aacd4ff86db54127": "Fil : précédent",
   "fbb1bdb8661202be": "Fil : suivant",
   "ee0314fdb92ae18f": "Fil : clore",
-  "c215c34cf5f38f7f": "Fil : épingler",
+  "c88d57b31a57c652": "Fil : Épingler ou ajouter une étoile",
   "79a68734ee1191a1": "Fil : régénérer le titre",
   "24737c375b670b30": "Fil : annuler",
   "8f43a21871389594": "Utilisation : coût",
@@ -12478,6 +12478,6 @@
   "500de308bbfea78c": "Étoile bleue. Retirer l’étoile",
   "d119e8cc5f01d5a9": "Impossible de mettre à jour l’étoile du fil",
   "abb2bb2e140299a4": "{color, select, green {Étoile verte} yellow {Étoile jaune} other {Étoile bleue}}",
-  "c59bdf5ee3dbd303": "Ajoutez des étoiles de couleur aux fils et filtrez la barre latérale pour afficher les fils suivis.",
+  "ea1d55cc4403f822": "Essayez les étoiles de couleur à la place des épingles. Vos fils épinglés réapparaissent lorsque vous désactivez cette option.",
   "cdc5a7db2e3647c7": "Étoiles des fils"
 }

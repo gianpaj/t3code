@@ -8781,7 +8781,7 @@
   "aacd4ff86db54127": "Thread: Previous",
   "fbb1bdb8661202be": "Thread: Next",
   "ee0314fdb92ae18f": "Thread: Settle",
-  "c215c34cf5f38f7f": "Thread: Pin",
+  "c88d57b31a57c652": "Thread: Pin or star",
   "79a68734ee1191a1": "Thread: Regenerate Title",
   "24737c375b670b30": "Thread: Undo",
   "8f43a21871389594": "Usage: Cost",
@@ -12487,6 +12487,6 @@
   "500de308bbfea78c": "Blue star. Remove star",
   "d119e8cc5f01d5a9": "Couldn't update thread star",
   "abb2bb2e140299a4": "{color, select, green {Green star} yellow {Yellow star} other {Blue star}}",
-  "c59bdf5ee3dbd303": "Add colored stars to threads and filter the sidebar by Starred.",
+  "ea1d55cc4403f822": "Try colored stars in place of pins. Your pinned threads return when you turn this off.",
   "cdc5a7db2e3647c7": "Thread stars"
 }

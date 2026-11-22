@@ -178,7 +178,11 @@ export function createSidebarSortingStrategy(input: {
       if (groups[name].length > 0) projected.push(...groups[name]);
       else marker(`${name}-placeholder`);
     };
-    marker("pinned-header");
+    if (items.some((item) => item.kind === "marker" && item.marker === "starred-header")) {
+      marker("starred-header");
+    } else if (items.some((item) => item.kind === "marker" && item.marker === "pinned-header")) {
+      marker("pinned-header");
+    }
     projected.push(...groups.pinned);
     marker("pinned-divider");
     if (items.some(isInboxMarker)) {

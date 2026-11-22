@@ -80,6 +80,8 @@ import type { RunStopPresentation } from "@t3tools/client-runtime/state/thread-e
 import { Atom } from "effect/reactivity";
 import { environmentThreadDetails } from "../../state/threads";
 import { type SideThreadOpenIntent, sideThreadKindOf } from "@t3tools/client-runtime/side-thread";
+import { useClientSettings } from "../../hooks/useSettings";
+import { useThreadStars } from "../sidebar/threadStars";
 import { openSideThread, resolveThreadOpenRoute } from "../../lib/sideChatPane";
 import type { useLocalDispatchState } from "./useLocalDispatchState";
 const RELATED_THREAD_SHELL_WAIT_MS = 1_000;
@@ -192,6 +194,8 @@ export function useThreadLifecycle(input: ThreadLifecycleInput) {
   const navigate = useNavigate();
   const router = useRouter();
   const { settleThread, pinThread, confirmAndUnpinThread } = useThreadActions();
+  const threadStarsEnabled = useClientSettings((settings) => settings.threadStarsEnabled);
+  const { cycleStar } = useThreadStars();
   const canWriteSourceControl = useEnvironmentScope(environmentId, AuthSourceControlWriteScope);
   const switchGitRef = useAtomCommand(vcsEnvironment.switchRef, { reportFailure: false });
   const updateThreadMetadata = useOrchestrationCommand(threadEnvironment.updateMetadata, {
@@ -729,6 +733,11 @@ export function useThreadLifecycle(input: ThreadLifecycleInput) {
       }
       if (!readEnvironmentScope(environmentId, AuthOrchestrationOperateScope)) return false;
       if (!activeThreadShell || !activeThreadRef || !serverConfigLoaded) return;
+      if (threadStarsEnabled) {
+        if (serverConfig.environment.capabilities.threadStars !== true) return false;
+        void cycleStar(activeThreadRef);
+        return;
+      }
       void (
         activeThreadPinned ? confirmAndUnpinThread(activeThreadRef) : pinThread(activeThreadRef)
       ).then(

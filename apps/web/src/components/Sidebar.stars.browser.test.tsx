@@ -38,7 +38,7 @@ vi.mock(import("~/rpc/requestLatencyState"), async (original) => ({
   trackRpcRequestSent: () => {},
 }));
 
-it("cycles thread stars without reranking and finds stars outside the initial shell", async () => {
+it("replaces pins with reversible thread stars and finds stars outside the initial shell", async () => {
   const projectId = ProjectId.make("other-project");
   const at = "2026-03-17T19:12:28.000Z";
   const review = {
@@ -68,6 +68,17 @@ it("cycles thread stars without reranking and finds stars outside the initial sh
   } as const;
   const read = { ...threadWithHistory("read-star", 1), projectId, starColor: "yellow" } as const;
   const ordinary = threadWithHistory("ordinary", 1);
+  const pin = {
+    ...threadWithHistory("legacy-pin-1", 1),
+    pinnedAt: DateTime.makeUnsafe(at),
+    pinOrderKey: "a0",
+  };
+  const otherPin = {
+    ...threadWithHistory("legacy-pin-2", 1),
+    pinnedAt: DateTime.makeUnsafe(at),
+    pinOrderKey: "a1",
+    starColor: "blue",
+  } as const;
   const history = {
     ...threadWithHistory("zz-older-star", 1),
     projectId,
@@ -80,6 +91,8 @@ it("cycles thread stars without reranking and finds stars outside the initial sh
       review,
       read,
       ordinary,
+      otherPin,
+      pin,
       rejected,
       ...Array.from({ length: 30 }, (_, index) => ({
         ...threadWithHistory(`older-unstarred-${index}`, 1),
@@ -100,7 +113,7 @@ it("cycles thread stars without reranking and finds stars outside the initial sh
   __setClientSettingsForTests({
     ...DEFAULT_CLIENT_SETTINGS,
     priorityInboxEnabled: true,
-    threadStarsEnabled: true,
+    threadStarsEnabled: false,
     sidebarProjectSortOrder: "manual",
     onboardingCompletedAt: "2026-01-01T00:00:00.000Z",
   });
@@ -128,16 +141,50 @@ it("cycles thread stars without reranking and finds stars outside the initial sh
     dispatchedCommands().flatMap((command) =>
       command.type === "thread.star.set" && command.threadId === threadId ? [command.color] : [],
     );
-  const placements = () =>
-    Array.from(screen.container.querySelectorAll('[data-testid="sidebar-row-card"]'), (row) => [
-      row.closest("[data-thread-item]")?.getAttribute("data-thread-item"),
-      row.getAttribute("data-sidebar-parent"),
-    ]);
+  const labs = () => router.navigate({ to: "/settings/labs" });
+  const prioritySwitch = page.getByRole("switch", { name: "Priority inbox" });
+  const starsSwitch = page.getByRole("switch", { name: "Thread stars" });
+  const starredShelf = screen.getByRole("heading", { name: "Starred", exact: true });
+  const pinRow = rowOf(pin);
+  const otherPinRow = rowOf(otherPin);
+  const unpin = (row: typeof pinRow) => row.getByRole("button", { name: "Unpin thread" });
+  const expectPinOrder = () => {
+    expect(
+      pinRow.element().compareDocumentPosition(otherPinRow.element()) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+  };
 
   await expect.element(ordinaryRow).toBeVisible();
   await expect.element(reviewRow).toHaveAttribute("data-sidebar-parent", "shelf:priority");
   await expect.element(ordinaryRow).toHaveAttribute("data-sidebar-parent", "shelf:other");
-  const original = placements();
+  await expect.element(unpin(pinRow)).toBeInTheDocument();
+  expectPinOrder();
+  await labs();
+  await userEvent.click(starsSwitch);
+  await router.navigate({ href: threadPath });
+  await expect.element(starredShelf).toBeVisible();
+  await expect.element(unpin(pinRow)).not.toBeInTheDocument();
+  expectPinOrder();
+  await userEvent.click(screen.getByRole("button", { name: `Thread actions for ${review.title}` }));
+  await expect
+    .element(page.getByRole("menuitem", { name: "Green star. Change to yellow" }))
+    .toBeVisible();
+  await expect.element(page.getByRole("menuitem", { name: "Pin thread" })).not.toBeInTheDocument();
+  await userEvent.keyboard("{Escape}");
+  for (const name of [
+    "Green star. Change to yellow",
+    "Yellow star. Change to blue",
+    "Blue star. Remove star",
+  ]) {
+    await userEvent.click(pinRow.getByRole("button", { name }));
+  }
+  await expect.element(pinRow.getByRole("button", { name: "Add green star" })).toBeInTheDocument();
+  await expect.element(pinRow).toHaveAttribute("data-sidebar-parent", "shelf:other");
+  await expect
+    .element(otherPinRow.getByRole("button", { name: "Blue star. Remove star" }))
+    .toBeVisible();
+  await vi.waitFor(() => expect(starsFor(pin.id)).toEqual(["yellow", "blue", null]));
   await userEvent.hover(ordinaryRow);
   const add = ordinaryRow.getByRole("button", { name: "Add green star" });
   await expect.element(add).toHaveStyle({ opacity: "1" });
@@ -158,7 +205,11 @@ it("cycles thread stars without reranking and finds stars outside the initial sh
     .element(ordinaryRow.getByRole("button", { name: "Blue star. Remove star" }))
     .toBeVisible();
   await vi.waitFor(() => expect(starsFor(ordinary.id)).toEqual(["green", "yellow", "blue"]));
-  expect(placements()).toEqual(original);
+  await expect.element(ordinaryRow).not.toHaveAttribute("data-sidebar-parent", "shelf:other");
+  expect(
+    otherPinRow.element().compareDocumentPosition(ordinaryRow.element()) &
+      Node.DOCUMENT_POSITION_FOLLOWING,
+  ).toBeTruthy();
 
   await userEvent.hover(rejectRow);
   await userEvent.click(rejectRow.getByRole("button", { name: "Add green star" }));
@@ -205,8 +256,6 @@ it("cycles thread stars without reranking and finds stars outside the initial sh
     .toBeInTheDocument();
 
   await userEvent.click(starred);
-  const prioritySwitch = page.getByRole("switch", { name: "Priority inbox" });
-  const starsSwitch = page.getByRole("switch", { name: "Thread stars" });
   await router.navigate({ to: "/settings/labs" });
   await expect.element(prioritySwitch).toBeChecked();
   await expect.element(starsSwitch).toBeChecked();
@@ -227,6 +276,9 @@ it("cycles thread stars without reranking and finds stars outside the initial sh
   await expect.element(starred).not.toBeInTheDocument();
   await expect.element(yellow).not.toBeInTheDocument();
   await expect.element(ordinaryRow).toBeVisible();
+  await expect.element(unpin(pinRow)).toBeInTheDocument();
+  await expect.element(unpin(otherPinRow)).toBeInTheDocument();
+  expectPinOrder();
 
   await router.navigate({ to: "/settings/labs" });
   await userEvent.click(starsSwitch);
@@ -234,4 +286,6 @@ it("cycles thread stars without reranking and finds stars outside the initial sh
   await router.navigate({ href: threadPath });
   await expect.element(starred).toBeVisible();
   await expect.element(yellow).toBeVisible();
+  await expect.element(pinRow).not.toBeInTheDocument();
+  await expect.element(otherPinRow).toBeVisible();
 });

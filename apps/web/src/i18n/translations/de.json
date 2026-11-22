@@ -8773,7 +8773,7 @@
   "aacd4ff86db54127": "Thread: Vorheriger",
   "fbb1bdb8661202be": "Thread: Nächster",
   "ee0314fdb92ae18f": "Thread: Erledigen",
-  "c215c34cf5f38f7f": "Thread: Anheften",
+  "c88d57b31a57c652": "Thread: Anheften oder markieren",
   "79a68734ee1191a1": "Thread: Titel neu erzeugen",
   "24737c375b670b30": "Thread: Rückgängig",
   "8f43a21871389594": "Nutzung: Kosten",
@@ -12478,6 +12478,6 @@
   "500de308bbfea78c": "Blauer Stern. Stern entfernen",
   "d119e8cc5f01d5a9": "Der Stern konnte nicht aktualisiert werden",
   "abb2bb2e140299a4": "{color, select, green {Grüner Stern} yellow {Gelber Stern} other {Blauer Stern}}",
-  "c59bdf5ee3dbd303": "Markiere Threads mit farbigen Sternen und filtere die Seitenleiste nach markierten Threads.",
+  "ea1d55cc4403f822": "Probiere farbige Sterne anstelle von Pins aus. Wenn du die Funktion deaktivierst, werden deine angehefteten Threads wieder angezeigt.",
   "cdc5a7db2e3647c7": "Thread-Sterne"
 }

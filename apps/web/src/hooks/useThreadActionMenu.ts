@@ -1,6 +1,11 @@
 import { thrownErrorMessage } from "@t3tools/client-runtime/errors";
-import { scopeProjectRef } from "@t3tools/client-runtime/environment";
+import { scopeProjectRef, scopedThreadKey } from "@t3tools/client-runtime/environment";
 import { requestCustomSnooze } from "../components/CustomSnoozeDialog";
+import {
+  threadStarLabel,
+  useThreadStars,
+  visibleThreadStar,
+} from "../components/sidebar/threadStars";
 import { openGuestShareDialog } from "../components/chat/guestShareDialogState";
 import {
   type AtomCommandResult,
@@ -34,6 +39,7 @@ import { readEnvironmentScope } from "../state/session";
 import {
   readEnvironmentServerConfigLoaded,
   readEnvironmentSupportsAutoSettleOptOut,
+  readEnvironmentSupportsThreadStars,
   readThreadShell,
   useProjects,
 } from "../state/entities";
@@ -99,6 +105,8 @@ export function useThreadActionMenu(input: {
   const confirmThreadDelete = useClientSettings((s) => s.confirmThreadDelete);
   const confirmThreadArchive = useClientSettings((s) => s.confirmThreadArchive);
   const timestampFormat = useClientSettings((s) => s.timestampFormat);
+  const threadStarsEnabled = useClientSettings((s) => s.threadStarsEnabled);
+  const { pendingStars, cycleStar } = useThreadStars();
   const { copyToClipboard: copyPathToClipboard } = useCopyToClipboard<{ path: string }>({
     onError: (error) => failureToast(m(msg("Failed to copy path")), error),
   });
@@ -133,7 +141,7 @@ export function useThreadActionMenu(input: {
         settlement: configLoaded,
         autoSettleOptOut: readEnvironmentSupportsAutoSettleOptOut(threadRef.environmentId),
         snooze: configLoaded,
-        pinning: configLoaded,
+        pinning: configLoaded && !threadStarsEnabled,
         titleRegeneration: configLoaded,
       };
       const isRegeneratingTitle = thread.titleRegeneration != null;
@@ -144,6 +152,12 @@ export function useThreadActionMenu(input: {
         branch: thread.branch ?? null,
         projectFilter: null,
         isPinned: thread.pinnedAt != null,
+        starActionLabel:
+          threadStarsEnabled && readEnvironmentSupportsThreadStars(threadRef.environmentId)
+            ? threadStarLabel(
+                visibleThreadStar(thread, pendingStars.get(scopedThreadKey(threadRef))),
+              )
+            : undefined,
         isSettled: supports.settlement && thread.settledOverride === "settled",
         autoSettleEnabled: thread.autoSettleDisabledAt == null,
         isSnoozed: supports.snooze && effectiveSnoozed(thread, { now: now.toISOString() }),
@@ -237,6 +251,9 @@ export function useThreadActionMenu(input: {
           return;
         case "unsnooze":
           await reportFailure(m(msg("Failed to wake thread")), () => unsnoozeThread(threadRef));
+          return;
+        case "cycle-star":
+          await cycleStar(threadRef);
           return;
         case "pin":
           await reportFailure(m(msg("Failed to pin thread")), () => pinThread(threadRef));

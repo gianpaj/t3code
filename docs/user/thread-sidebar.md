@@ -68,8 +68,8 @@ Pick projects with the three shortcuts or search for more in the project picker.
 Both controls update the same selection. Choose **All projects** in the picker to clear it.
 
 Click **All** to cycle through **Unread**, **Read**, and **All**. Read status follows
-whether you have seen the latest completion. Unread and Read show matching active
-and pinned threads. All also shows the Working, Snoozed, and Settled sections.
+whether you have seen the latest completion. Unread and Read narrow the active threads
+and the Pinned or Starred shelf. All also shows the Working, Snoozed, and Settled sections.
 
 **Priority** contains active threads with an approval, a question, or a known open
 pull request. Draft pull requests qualify. **Show more** reveals the matching threads
@@ -77,9 +77,11 @@ beyond the first five. You can collapse Priority and **Everything else** indepen
 If you use the Boring sidebar, threads stay grouped in project folders and the filters
 are available above them.
 
-Turn on **Thread stars** in the same Beta section. Click the star on a thread to cycle
-through green, yellow, and blue, then clear it. On touch screens, use the thread menu.
-The **Starred** filter shows any color, including stars in Settled.
+Turn on **Thread stars** in the same Beta section to replace pins with colored stars.
+Existing pins start green and keep their order at the top. Click a star to cycle through
+green, yellow, and blue, then clear it. The pin shortcut cycles the star in the current
+thread. On touch screens, use the thread menu. The **Starred** filter shows any color,
+including stars in Settled. Turn the beta off to return to your saved pins and order.
 
 ## Pin and reorder threads
 
@@ -100,7 +102,8 @@ files directly; see [Attach files](./composer.md#attach-files).
 On web and desktop, pinning or unpinning a thread keeps the sidebar at your current
 scroll position instead of following the thread to its new place in the list.
 
-Pinning does not prevent automatic settlement. Settling a thread removes its pin.
+Settling a pinned thread removes its pin when using the Pinned shelf. With Thread stars
+enabled, settling keeps the saved pin and moves the thread to Settled.
 
 On web and desktop, drag a thread between sections to change its state. Drag a thread up into
 the pinned section to pin it at the spot you drop it; drag a pinned thread down into the active

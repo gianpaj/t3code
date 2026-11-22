@@ -44,6 +44,7 @@ import {
   readDelegatedUnderParent,
   readEnvironmentServerConfigLoaded,
   readEnvironmentSupportsAutoSettleOptOut,
+  readEnvironmentSupportsThreadStars,
   readEnvironmentThreadRefs,
   readProject,
   readThreadShell,
@@ -362,6 +363,7 @@ export function useThreadActions() {
   const sidebarThreadSortOrder = useClientSettings((settings) => settings.sidebarThreadSortOrder);
   const confirmThreadDelete = useClientSettings((settings) => settings.confirmThreadDelete);
   const confirmThreadUnpin = useClientSettings((settings) => settings.confirmThreadUnpin);
+  const threadStarsEnabled = useClientSettings((settings) => settings.threadStarsEnabled);
   const clearComposerDraftForThread = useComposerDraftStore((store) => store.clearDraftThread);
   const clearProjectDraftThreadById = useComposerDraftStore(
     (store) => store.clearProjectDraftThreadById,
@@ -861,7 +863,12 @@ export function useThreadActions() {
     const action = ThreadUndo.begin("settle", scopedThreadKey(target));
     const result = await settleThreadMutation({
       environmentId: target.environmentId,
-      input: { threadId: target.threadId },
+      input: {
+        threadId: target.threadId,
+        ...(threadStarsEnabled && readEnvironmentSupportsThreadStars(target.environmentId)
+          ? { preservePin: true }
+          : {}),
+      },
     });
     if (result._tag !== "Success") {
       action.finish();

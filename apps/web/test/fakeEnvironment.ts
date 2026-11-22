@@ -14,6 +14,7 @@ import {
   ORCHESTRATION_V2_WS_METHODS,
   ProjectId,
   ProviderInstanceId,
+  resolveThreadStar,
   RunId,
   RuntimeRequestId,
   ServerConfig,
@@ -225,9 +226,11 @@ function run(
   } satisfies OrchestrationV2Run;
 }
 
-export interface FakeThread {
+export interface FakeThread extends Pick<
+  OrchestrationV2ThreadShell,
+  "starColor" | "pinnedAt" | "pinOrderKey"
+> {
   readonly projectId?: ProjectId;
-  readonly starColor?: OrchestrationV2ThreadShell["starColor"];
   readonly pullRequests?: OrchestrationV2ThreadShell["pullRequests"];
   readonly lastVisitedAt?: OrchestrationV2ThreadShell["lastVisitedAt"];
   /** Makes this a side chat of that thread. */
@@ -334,6 +337,8 @@ function shellOf(thread: FakeThread): OrchestrationV2ThreadShell {
     activeProviderThreadId: thread.providerThreads?.[0]?.id ?? null,
     ...(thread.issues === undefined ? {} : { issues: thread.issues }),
     ...(thread.starColor === undefined ? {} : { starColor: thread.starColor }),
+    ...(thread.pinnedAt === undefined ? {} : { pinnedAt: thread.pinnedAt }),
+    ...(thread.pinOrderKey === undefined ? {} : { pinOrderKey: thread.pinOrderKey }),
     ...(thread.pullRequests === undefined ? {} : { pullRequests: thread.pullRequests }),
     lineage: {
       rootThreadId: parentOf(thread) ?? thread.id,
@@ -578,7 +583,7 @@ const handlers: Record<string, (input: never) => unknown> = {
     const rows = threads.filter(
       (thread) =>
         thread.olderSettled &&
-        (!input.starredOnly || thread.starColor != null) &&
+        (!input.starredOnly || resolveThreadStar(thread) !== null) &&
         (input.projectIds === undefined ||
           input.projectIds.includes(thread.projectId ?? PROJECT_ID)) &&
         (settledAt < input.before.settledAt ||

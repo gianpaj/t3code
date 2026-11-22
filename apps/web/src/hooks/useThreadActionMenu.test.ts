@@ -35,6 +35,9 @@ function recordEffect(action: string) {
 }
 
 vi.mock("../components/CustomSnoozeDialog", () => ({ requestCustomSnooze: vi.fn() }));
+vi.mock("../components/sidebar/threadStars", () => ({
+  useThreadStars: () => ({ pendingStars: new Map(), cycleStar: vi.fn() }),
+}));
 vi.mock("react", () => ({
   useCallback: (callback: unknown) => callback,
   useMemo: (factory: () => unknown) => factory(),

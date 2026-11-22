@@ -8771,7 +8771,7 @@
   "aacd4ff86db54127": "Hilo: anterior",
   "fbb1bdb8661202be": "Hilo: siguiente",
   "ee0314fdb92ae18f": "Hilo: resolver",
-  "c215c34cf5f38f7f": "Hilo: fijar",
+  "c88d57b31a57c652": "Hilo: Fijar o destacar",
   "79a68734ee1191a1": "Hilo: regenerar título",
   "24737c375b670b30": "Hilo: deshacer",
   "8f43a21871389594": "Uso: coste",
@@ -12473,6 +12473,6 @@
   "500de308bbfea78c": "Estrella azul. Quitar estrella",
   "d119e8cc5f01d5a9": "No se pudo actualizar la estrella del hilo",
   "abb2bb2e140299a4": "{color, select, green {Estrella verde} yellow {Estrella amarilla} other {Estrella azul}}",
-  "c59bdf5ee3dbd303": "Añade estrellas de colores a los hilos y filtra la barra lateral por hilos con estrella.",
+  "ea1d55cc4403f822": "Prueba las estrellas de colores en lugar de fijar hilos. Al desactivar esta opción, volverás a ver tus hilos fijados.",
   "cdc5a7db2e3647c7": "Estrellas en hilos"
 }

@@ -1,0 +1,540 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Priority inbox mockup</title>
+<style>
+:root {
+  color-scheme: dark;
+  --background: #0a0a0a;
+  --foreground: #f5f5f5;
+  --card: #111111;
+  --popover: #111111;
+  --border: #191919;
+  --ring: #346bf1;
+  --primary: #346bf1;
+  --muted-foreground: #818181;
+  --destructive: #fb414a;
+  --destructive-foreground: #ff6467;
+  --warning: #fe9a00;
+  --warning-foreground: #ffb900;
+  --success-foreground: #34d399;
+  --info-foreground: #60a5fa;
+  --success: #10b981;
+  --info: #3b82f6;
+  --radius: 0.625rem;
+  --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+}
+
+@media (prefers-color-scheme: light) {
+  :root {
+    color-scheme: light;
+    --background: #fcfcfc;
+    --foreground: #27272a;
+    --card: #ffffff;
+    --popover: #ffffff;
+    --border: #e4e4e7;
+    --ring: #1b4ed8;
+    --primary: #1b4ed8;
+    --muted-foreground: #71717b;
+    --destructive: #fb2c36;
+    --destructive-foreground: #c10007;
+    --warning: #fe9a00;
+    --warning-foreground: #bb4d00;
+    --success-foreground: #047857;
+    --info-foreground: #1d4ed8;
+  }
+}
+
+html {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  line-height: 1.5;
+  padding: 8px;
+  -webkit-font-smoothing: antialiased;
+}
+
+body {
+  margin: 0;
+}
+
+*{box-sizing:border-box}
+.mock{font:14px var(--font-sans);max-width:400px;margin:0 auto;--side:color-mix(in srgb,var(--card) 74%,var(--background));--label:var(--muted-foreground);--hover:color-mix(in srgb,var(--foreground) 8%,transparent);--selection:color-mix(in srgb,var(--foreground) 11%,transparent);color:var(--foreground)}
+.sidebar{position:relative;background:var(--side);border:1px solid var(--border);border-radius:var(--radius);padding:6px 8px 8px;min-width:0}
+button,input{font:inherit;color:inherit}
+button,summary{cursor:pointer}
+button:focus-visible,summary:focus-visible,input:focus-visible,.row:focus-visible{outline:2px solid var(--ring);outline-offset:1px}
+.toolbar{position:relative;z-index:2;display:flex;gap:5px;align-items:center;min-height:34px;margin:1px 0 8px}
+.quick-projects{display:flex;gap:1px;align-items:center;flex:1}
+.toolbar button,.project-picker>summary{border:1px solid transparent;background:none;border-radius:5px;font-size:12px;padding:4px 7px;color:var(--label);white-space:nowrap;line-height:16px}
+.toolbar button:hover,.project-picker>summary:hover{background:var(--hover)}
+.toolbar button[aria-pressed=true],.project-picker[open]>summary,.project-picker[data-filtered]>summary{border-color:var(--border);background:var(--hover);color:var(--foreground)}
+.toolbar .read-filter{flex:none;min-width:60px;border-color:var(--border)}
+.toolbar .read-filter[data-state]:not([data-state=all]){background:var(--hover);color:var(--foreground)}
+.toolbar .star-filter[aria-pressed]{display:grid;place-items:center;flex:none;width:25px;height:25px;padding:0;color:var(--label)}
+.star-filter .line-icon{width:13px;height:13px}
+.star-filter[aria-pressed=true] .line-icon{fill:currentColor}
+.project-picker{position:relative;flex:none}
+.project-picker>summary{display:grid;place-items:center;width:25px;height:25px;padding:0;list-style:none}
+.project-picker>summary::-webkit-details-marker,.shelf>summary::-webkit-details-marker{display:none}
+.caret{width:6px;height:6px;border-bottom:1px solid var(--label);border-right:1px solid var(--label);transform:rotate(45deg) translateY(-2px);flex:none}
+.sidebar:has(.project-picker[open]){min-height:238px}
+.popup,.row-menu{position:absolute;padding:5px;background:var(--popover);border:1px solid var(--border);border-radius:var(--radius);box-shadow:0 4px 18px #0003;display:grid;gap:3px}
+.popup{top:calc(100% + 5px);right:0;width:min(217px,calc(100vw - 40px))}
+.popup input[type=search],.row-menu input{background:var(--background);border:1px solid var(--border);border-radius:5px;padding:6px 8px;font-size:12px;min-width:0;width:100%}
+.toolbar .popup button,.popup label{width:100%;font-size:12px;text-align:left;border:0;background:none;padding:5px 6px;border-radius:4px;cursor:pointer}
+.popup label{display:flex;align-items:center;justify-content:space-between}
+.popup label input{margin:0;accent-color:var(--primary)}
+.toolbar .popup button:hover,.popup label:hover{background:var(--hover)}
+.shelf>summary{font-size:12px;color:var(--label);margin:0;padding:6px 10px 4px;display:flex;justify-content:space-between;gap:4px;font-weight:500;align-items:center;min-height:29px;list-style:none}
+.shelf-count{font-weight:400;font-variant-numeric:tabular-nums}
+.group+.group{margin-top:4px}
+.rows{list-style:none;margin:0;padding:0}
+.rows li{margin:0;padding:2px 0}
+.row{cursor:pointer;height:78px;border-radius:6px;width:100%;display:flex;flex-direction:column;justify-content:center;min-width:0;text-align:left;padding:8px 10px}
+.row:hover{background:var(--hover)}
+.row[aria-current=true]{background:var(--selection)}
+.topline,.meta,.slim{display:flex;align-items:center;gap:6px;text-align:left;min-width:0}
+.topline{height:20px;color:var(--label);font-size:12px;width:100%}
+.project-name,.title,.branch{white-space:nowrap;text-overflow:ellipsis;overflow:hidden;min-width:0}
+.project-name,.branch,.slim .title{flex:1}
+.project-icon{flex:none;display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:4px;font-size:8px;font-weight:650;color:var(--project-color);background:color-mix(in srgb,var(--project-color) 15%,var(--side))}
+.title{font-size:14px;font-weight:500;margin-top:4px;line-height:20px}
+.recede:not([aria-current=true]) .title{opacity:.75;font-weight:400}
+.status,.age{white-space:nowrap;display:inline-flex;align-items:center;gap:4px;font-variant-numeric:tabular-nums}
+.done,.open{color:var(--success-foreground,var(--success))}
+.done{font-weight:500}
+.meta{color:var(--label);margin-top:2px;height:16px;font-size:12px}
+.pr{white-space:nowrap;display:inline-flex;align-items:center;gap:3px;font-variant-numeric:tabular-nums}
+.merged{color:light-dark(#7c3aed,#c4b5fd)}
+.asset{display:inline-block;flex:none;width:12px;height:12px;background-color:currentColor;mask:var(--icon) center / contain no-repeat}
+.provider{margin-left:auto;width:14px;height:14px;color:var(--foreground);opacity:.6}
+.provider.claude{color:#d97757}
+.working-glyph,.line-icon{width:16px;height:16px}
+.line-icon{display:inline-block;flex:none;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.status-slot{display:grid;grid-template-columns:auto auto;height:100%;align-items:center;margin-left:auto}
+.rest-status,.row-actions{grid-area:1 / 2;justify-self:end}
+.rest-status{display:flex;align-items:center}
+.row-actions{display:flex;align-items:center;opacity:0;pointer-events:none;white-space:nowrap}
+.row-actions button,.star-button{display:inline-flex;align-items:center;gap:4px;border:0;background:none;padding:3px 5px;color:var(--label);font-size:12px;line-height:14px;border-radius:4px}
+.row-actions button:hover,.star-button:hover{color:var(--foreground);background:var(--hover)}
+.row-actions .line-icon,.star-button .line-icon{width:14px;height:14px}
+.row-actions [data-action=snooze] .line-icon{width:12px;height:12px}
+.star-button{grid-area:1 / 1;opacity:0;pointer-events:none;--star-color:currentColor}
+.star-button[data-star=green]{--star-color:light-dark(#15803d,#4ade80)}
+.star-button[data-star=yellow]{--star-color:light-dark(#a16207,#facc15)}
+.star-button[data-star=blue]{--star-color:light-dark(#1d4ed8,#60a5fa)}
+.star-button .line-icon{stroke:var(--star-color)}
+.star-button:not([data-star=off]) .line-icon{fill:var(--star-color)}
+.star-button:not([data-star=off]),
+.row:has(.status-slot :focus-visible) .star-button,.row[data-show-actions] .star-button,
+.row:has(.status-slot :focus-visible) .row-actions,.row[data-show-actions] .row-actions{opacity:1;pointer-events:auto}
+.row:has(.status-slot :focus-visible) .rest-status,.row[data-show-actions] .rest-status{visibility:hidden}
+@media(any-hover:hover){
+  .row:hover .status-slot .star-button,.row:hover .row-actions{opacity:1;pointer-events:auto}
+  .row:has(.row-actions):hover .rest-status{visibility:hidden}
+}
+.sidebar:has(#row-menu:not([hidden])){min-height:340px}
+.row-menu{z-index:3;gap:1px;width:max-content;min-width:170px;max-width:calc(100% - 16px);padding:4px}
+.row-menu button{display:flex;align-items:center;gap:8px;border:0;background:none;text-align:left;min-height:26px;padding:4px 8px;border-radius:4px;font-size:12px;white-space:nowrap}
+.row-menu button:enabled:hover,.row-menu button:focus-visible{background:var(--hover)}
+.row-menu button:disabled{cursor:default}
+.row-menu .line-icon{width:14px;height:14px;color:var(--label)}
+.row-menu .menu-end{margin-left:auto;color:var(--label);font-size:11px}
+.menu-divider{margin-top:2px;border-top:1px solid var(--border);padding-top:2px}
+.shelves{margin-top:6px;padding-top:4px;border-top:1px solid var(--border)}
+.shelf:hover>summary{background:var(--hover);border-radius:6px}
+.shelf summary .name{display:flex;align-items:center;gap:8px}
+.shelf .caret{transform:rotate(-45deg)}
+.shelf[open] .caret{transform:rotate(45deg)}
+.slim{height:36px;flex-direction:row;gap:10px;color:var(--label)}
+.slim .title{margin:0}
+.slim .star-button{flex:none}
+.empty{padding:15px 10px;color:var(--label);font-size:12px}
+[hidden]{display:none!important}
+@media(max-width:390px){.toolbar button{padding-inline:5px}.toolbar{gap:4px}}
+@media(max-width:340px){.toolbar button{padding-inline:3px;font-size:11px}.toolbar .read-filter{min-width:54px}.toolbar{gap:3px}.toolbar .star-filter[aria-pressed],.project-picker>summary{width:22px}}
+@media(max-width:290px){.toolbar{flex-wrap:wrap}.quick-projects{flex-basis:100%}.project-picker{margin-left:auto}}
+</style>
+</head>
+<body>
+<div class="mock">
+  <aside class="sidebar" aria-label="Thread sidebar">
+    <header class="toolbar">
+      <div class="quick-projects" aria-label="Quick project filters" role="group">
+        <button type="button" data-project="Reports">Reports</button>
+        <button type="button" data-project="Platform">Platform</button>
+        <button type="button" data-project="Docs">Docs</button>
+      </div>
+      <button type="button" class="read-filter" id="read-filter" data-state="all">All</button>
+      <button type="button" class="star-filter" id="star-filter" aria-label="Starred" title="Starred" aria-pressed="false"></button>
+      <details class="project-picker" id="project-picker">
+        <summary aria-label="All projects" title="All projects"><span aria-hidden="true" class="caret"></span></summary>
+        <div class="popup">
+          <input type="search" id="project-search" placeholder="Search projects" aria-label="Search projects">
+          <button type="button" id="clear-projects">All projects</button>
+          <div id="projects"></div>
+        </div>
+      </details>
+    </header>
+    <details id="priority" class="group shelf" open>
+      <summary>
+        <span class="name"><span aria-hidden="true" class="caret"></span>Priority</span>
+        <span class="shelf-count"></span>
+      </summary>
+      <ul class="rows"></ul>
+    </details>
+    <details id="other" class="group shelf" open>
+      <summary>
+        <span class="name"><span aria-hidden="true" class="caret"></span>Everything else</span>
+        <span class="shelf-count"></span>
+      </summary>
+      <ul class="rows"></ul>
+    </details>
+    <p id="empty" class="empty" hidden>No matching threads.</p>
+    <div class="shelves" id="shelves">
+      <details id="working" class="shelf"><summary><span class="name"><span aria-hidden="true" class="caret"></span>Working</span><span class="shelf-count"></span></summary><ul class="rows"></ul></details>
+      <details id="snoozed" class="shelf" open><summary><span class="name"><span aria-hidden="true" class="caret"></span>Snoozed</span><span class="shelf-count"></span></summary><ul class="rows"></ul></details>
+      <details id="settled" class="shelf" open><summary><span class="name"><span aria-hidden="true" class="caret"></span>Settled</span><span class="shelf-count"></span></summary><ul class="rows"></ul></details>
+    </div>
+    <div class="row-menu" id="row-menu" role="menu" aria-label="Thread actions" hidden></div>
+  </aside>
+</div>
+<script>
+const demo = [
+  {id:"csv",project:"Reports",initials:"RP",color:"info",title:"Add CSV export to reports",branch:"feat/csv-export",provider:"codex",age:"12m",unread:true,priority:true,pr:418,prState:"open",star:"green"},
+  {id:"sdk",project:"Platform",initials:"PL",color:"warning",title:"Upgrade the auth SDK",branch:"chore/auth-sdk",provider:"claudeAgent",age:"46m",priority:true,pr:263,prState:"open"},
+  {id:"changelog",project:"Docs",initials:"DO",color:"success",title:"Refresh the changelog",branch:"docs/changelog",provider:"claudeAgent",age:"4m",unread:true},
+  {id:"receipt",project:"Billing",initials:"BI",color:"destructive",title:"Add email receipt previews",branch:"feat/receipt-preview",provider:"claudeAgent",age:"2h",pr:197,prState:"merged"},
+  {id:"retry",project:"Billing",initials:"BI",color:"destructive",title:"Add payment retries",branch:"feat/payment-retries",provider:"codex",age:"3m",shelf:"working"},
+  {id:"setup",project:"Platform",initials:"PL",color:"warning",title:"Fix local setup",provider:"codex",age:"1d",shelf:"settled"},
+];
+const icons = {"provider-codex":"data:image/png;base64,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","provider-claudeAgent":"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAACqaXHeAAAACXBIWXMAAB2HAAAdhwGP5fFlAAAJOUlEQVR4nOVbaZAdVRW+uARQpNxwX9BS0VJxBxUx7gZFglbdc3oykWhVjJZWDOOkz+lJ0IdQYkAttRBFLRVTQqHghqZKLZygEVBABZzMu7cnISFiAoGgJgQMSRjrdL83ea/f7dv91hnxVPWPed13Ofee5TvLKNUlVQnebQg2W4a7DeOfLMHX/lE59THdzDldqTxC/S+QXaWfKYxbxunGxxCu62S+9ZX5jzIRsiHcaRnPn6joeWqu0rTWjzSM12SZn3lW6le2O6chvKx5Hvi8mtu3j27mEymA77UzX0zDz7KE+5vmYDxgo0XPV3ORppU6zBDuzT0Axv9sHgueWnY+w/gZ1zzxmD5GzVUyhL/zSYEl+GzZuSzhjxxz7FJzmSxj6FcD3LltRB9Zai7CP7TOAdequUzbRvSRqQv0SsFHy8xlCKccavTdMmPjyvDRluBy2Uv64PfVoMhEwQLvATCaMn7dEPy75QAi5KJxm0YXP8UQbsyOrYYwrAZF1q2/hwwZw/t847dUlhyRY0gXesetWPh4Q3hzzrq7JlcNP10Ngjazfk6BR7jGN35qNT7bNa7KeGzemJtHFz/WEF7nP3hc1DFTNy1b9uh2IKllPNtrEFm/KW9sNdKvaccDJIiR4RcFOORgxy40Xr7gcMtwde32/ik3WA31cb4xgv8N4+2eTY3njTWEpzg8wNW53zN+q8DuyL6vV52SZfyhY9LdhjT4xpkI0b+p4G3O9Ugvaf0WvuBcg+DMIuaTJ9JDnR8AwXaPW/uKqIcHHXrAkduvW4KxMvpbDeGtWbjsPmi4sGPmhURcvYsQ3rBxdNFzlYMkCEowfN7momBBdowh/EaLAcyoXM3Q7ixknvC6rqNIQ/C54oXgTrkR5yEQfscjBTeKpDSt12LQ4D6JNpsAF+OfC8WeYHtPXN+WypIjilxMzdAcMIxRlqFqGDxDmPCMa/Lvrb68WVUsw9pi5nG/DfFk1SuKly843DCe5xPnBp37pfnU0JMzmz7HIwW3NLpYcXmZ91+feUfBJ0sZPYZR1Q8yY3CSZdhaQvfuiEM9vz5uoqKPsow78m0B6rp4t7yPcFnKvD7BEu4rcQE/zkphTymuDB/dmq1x2oWDlmBNXX8lEPIc2EaRAicKJH2CwFzLeFsJNbx9YkQ/UQ2CbITLLOGeEsZovWSMEsTmCFRmNh/C6eI1snZFYK5l+HkJvd9nInidGiSZUf08S/DbEjp5t43gPcmTf3uXmBDfnvl9dynmU2A1omaDppU6rBrpj6Wb9auEILo8j2AY7hLEVs7ItajQVX3V+zIkYMgw/KYTBhoOYbKDMXdNRqc/Sc0Fmhb4y7DUMP6rm4No6yH9kVJ7EyMb6RdYDt5vGc6SGMcwTCSgKtJDYqN6dhBizQ3Br/vNvGzeFaYLbokJXm84+IQh+KYh+KMPjNXU6FzVF9tQxlN0xvxDkldI1gn1cSbED0rgk5bkivFC6wPnqH6QFDMKU+YdHoBl3CA5ih7MdUACrERPDOvFlvFDloP3VgnfaMaGXixFjbywtwyl8wYjhvH+gdmGUozDpGG8WDCIEjIMl3oHEe4RtFULWMYN4ZWW8Ns193ZWgtVJL5GszuQYvCwbE8hhSmZ4dpjF+yUzlKgJaXBWqgzhVT1fmOCBWr1gg2W4wjLE/WcYHhRmpTwfE3zYrAyOL2XlN6V59TtmWzQ7YPi+pJpEsMZG8I6yFSgnVRmPlcDFEFwgLiStsuA6MWSG4C+129xhCe6tGaLBizPBnaJ+VcYVUyG8ujFhMnCaqOh5t0aLniBWVCy+uCRJbcsjiU+5kTjEUxPjKgEUwy1dHwLh3yRGqKXPzjYhfFzyhhJWNz0SYIV48hQFL51YqZ/WjSHvCUmOwJtkHYz0SNntNsllSlifl8/sKW0Mh15oCH4y+7bC+ewWz6X6QZKcsIxf7gyZ5Yr//jRshjfXGinGu8UXAoTihgxW94xX9Lxa0WJXPiPws6IQ2nMIe6qMb2lcLwFtBJRklQnu7WDOG3rCfC3aiv0WXIOrANKeLuNeMbB5yLPK+uVpMISXlXTtF3XFeGr1PZ1iyQNrJXaXA8i60I5yAQQPyIGXzl4xnFFDrjNrGYbfdyX+sXR0MaxNkqD5Oibw+RT53kbBiS06S3iTL2lapL9lO0+a9j2mjxEM0THj69Mk56e9vQDpoVxUDU97nIyR2MAw/D2rz4mXYLykQVIebDdmMAQVNSiyhC8Ro+E3KmAbqzNJROhMksAZyeFIHH/ot1h0OKf4uUNAjivPIMCor6hwWpIPjCu8bkc2TbBGSmqNY+WGHN//YOZ9Q1wvepn+Bhfm3PYFluEVrh4EKYxk1+4JTUnRoiAFbhj/6tKrmIJ3Zm2EdILVVUNC04xUXCG/C8R29h8zHhC3J/A2TXe17GW8Pnfv/Drnd3xIJ6glXO3C2mIkW0rZhPuqYfDa+jeiKnk1fY9xNBL1JeU0gssdqnVjNh/RpaXHPNd2rdgEz8Fd7xDhMxu/k8xu5oBW19+JTidewqkK+MWGZoxzHeowKXvvTTM0ZYxO8jcs9zVPuZodJIpr7QnAizMbX9r4PubgVS6DWFeFQ/PA0tbvYOtkhC/q/hCi4ETRTUl/SfhZFEVJJsZx89tcRYxsw4OEz45vzvOpwsy6Eb4razekeCKHqAZFNm2NyYKd/a72uLQxMvH7M98KqnT2KOQUV7NNVDWV3ZCVWAmi+s27khu2BFscG12VL1nN34rHcX1bC3gOulRhKtJvyAI1cceNkFuMcV9riNPynyMOsCM1wzxbIQFLhpmHfI1NhuGrTlUgqLpygUlFmvCe+tzt/N9CbxqqCLb7FpUu8Iyo3uNbI2mLZdhURhXqVGu8+KnYEdUvMowLW5KkkjhdGRzvG2cZb80wMVG0ltT98ryC5P/UoGmTpNOlvt/so/f6eoLrLbUOt5XbFlvm32oG2hpfpyxmF2Qo8FcVkBg1hxhfqkpQApCylj5dO1KDJkO4rlEMLeEHSo3jYMQBlL7UXlNGcy+ChOhq0GTG4KS0cII7Jf/fTSO25PXaWbsaBqel1WfYKshzVv+zbH2bXRbunsM0P/Cwp4mKPspVWhMoq/5fyDL+qkUFCtzmw4riUM9PM7szBzA+6/U7NWBKAifCK8V4dlXW7gH9F9PG7x3lw/KlAAAAAElFTkSuQmCC","git-pull-request-arrow":"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAACqaXHeAAAACXBIWXMAAB2HAAAdhwGP5fFlAAAD0ElEQVR4nO2a7WtPYRjHD1bGHsxLLzfEyOw9myYxmi3Fb+WpPLwxkiKSjCKv8ALtD/CUPagJtUh5LCQkJUIe3thMsmWm2EdXOy90dt/3ef79djif+r0717nu6/u7zrnv6zqXZaWkpKSkmAHGAVXAPuAUcBY4DjQBZVYMAJVAi/2rjMOHK8AEYA/Qg5mHwBIrIoA6YPCv+//IughABfAWf7QBBREE/1Nx75boonNfxEKgn2A8BkoiDj57AgBlwGfCcQ3IizD4waw9AsA9Q2ADwC2gE3gKDBmu3ebD51L7OVchotTHG7UN0KBZxC/gIFDouH4mcF1j0w0UWUkJXgAuKxYh/3KjZd4iOzQBrNHZjcbgCzSLOePBtgToVdi2GWy22pml4jdw195VVD85hxwDVnnJMq8CzNUsZr5H+5MK2xeaaxuJjq/AbsnEsAIs0zgo9Gi/SWHbp7n2OdHTBUwMI8DSkAJsVth+y6IAxkcuzCNQ5dFeaoRcPAJOVoR5CQ4obnjOg+1k4IvCttVg0xTiJdhpqE8eBBLAZRtcbWmQEx9wMeA2WOuyDTYYbAs1ZxBZ7xSTX9OC6jWLkX/qsHPLAWYBNwwHIdf3R0gRyjV2CwIJIAB30CMLfQ98BD5gpsnySFARgDEam5VefY8AKI2gGOryuy8HLYY012f8+B4BUBOiHH4ETLKyVA7HIoAAzAFe+wz+fKjDSICGSGwCCEA+sAv45BL4fWCRlYOWWKwCOCq+Zo2zUiuHTdGsCCDITVWerByTCqAmzQArhlTLqKSO3JH/daUZoCDNACuGVMuopI7ckf91pRmgIM0AK4ZUy6ikjtyR/3X9vxkATNUI0By6TT6aBbA72FJ2m+i2vxfk/zMCMNy41X2G0/FGSvvEC8Bw51lmD4IgzZ2axArAcDl+lXBI2356UgXYYQhsyG7USpP2naG5KtxOnABAsaFJK83XGY7ri4BDho8uy5MmwHpNIK2mrU4+5mgmWC4lTYAOhVvJiGIPttKkdTIQqHFL7gR4qXB7wqNttSZ7KpIkQL/C7QaPtvL9UEVtkgToU7jd6OMFqsL/VCvpI0CuMqBd4bbXy+c34ILC9rvMQCdJgHWaNG532QbXarbBzqALyeRIgCLDNIgMSJQrnvsj9pSJirokHoW3Y+aZHHDs2QbTUfhmkouhK4QvhqYluRwuCVEOy1ZaHcXQhJOeyCL03hCRGsAPr4DZUTjPA544br4/ksj8r2WxjMO5BC4zDTuB8VGn4QHgtNsIXDaw55m2AEftAWqZV94LzAPG5np9KSkpKdZo5w9pZhdo1AsXswAAAABJRU5ErkJggg==","git-merge":"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAACqaXHeAAAACXBIWXMAAB2HAAAdhwGP5fFlAAAC30lEQVR4nO2ay2oUQRSGT1zoyggKLkSSuBHJKlu3PoBG42XjRgNJ3KkvEE1EiC6FWRkl0ZWCutFgXsAncCkYNYl4WXhBZ0D85DAlNENVTfXcqOruDwqG6TpJn79P1Zmif5GKioqKinCAPcA5YBG4b8ai+W5YigpwCHgINHCj1x4AY1IkgEttEm+lDsxKEQBu0zlLkjLANN0zJwmv+YYnsU3guRlbnnm/gVFJDZobno0PwAlgKDN3CJg0othYlQRbXcOR/EFP3IijGupJtUiaPd3G8YDYk47YM5IKwA1LApvZsvfE7nBUwYKkAnDPksCLHPFrlvhlSQVg2ZLAWo74l5b4u5L4EtjKsQS2U18CZ7EzGRA75Yg9LakADDvaoG6EI564UcfT1za4W1KC5qkOx1I4paXeUvZTjuSVFUkNYMw8ORdfgA0z9LPvp7CzaqIGuED3zEjKAEtdJH9TigAwY0o5FJ07LUWC5g6/2mZf0Gsrya75HC3ylSX5t8m1uk4BHlkE+JVtjWUUQDksJRdgVkouwBMpuQB1YK+UWADlspRcgPfATimxAMWvAtoL8A04ICUWQFkv7A8jwgRQ5gvpTyBcgL+9OhVG5U8gXADlD3CxUP4E7ALomn/jqYT5TvaEKP0J2AXQ78aBr54bWs/THaL1J+AQwFw7Cvz03NB34CqwK1l/Ah4BMiL4KuH/q/YrrrND1P4E2ghg5ox79oQs+pSfmY3uiHnHELc/gQABzDxN5HGACK03q+eJeP0JBAqQmX/e89YolE/R+BPIKUCmGm4BPzoUYCMafwIdCJCJ3QdcA971UYD++hPoQoCWUj0G3AFeBwjwORp/Aj0QwPI39xtB5oCnUfsT6IMASfkT6LMA0fsTGIwA7fwJ22a31/FxoP4EBiBA1P4EBiRAtP4EoGb5Z7XS+BOAiZYb0s8TpfIn0BShZkZfk7e0SPUxLhhLr47retgpjT+hoqKiQnrEP5zE0RxDWf7KAAAAAElFTkSuQmCC","circle-dashed":"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAACqaXHeAAAACXBIWXMAAB2HAAAdhwGP5fFlAAADUElEQVR4nO2bz08TQRTHB5HgRRRjItyJcENU8ASJQBr0oHjpCS5e+R9A/wtIiZ5IL5CWo1L/AUwUr8V/wUuNnmo+ZrKPpI4709KdXXa7+0makDKdN292dn689x2lCgoSBZgE5oFV4BWwLn/r7ybVIAK8Bj4DP+mOLnOqf6MGAaBM/5RV1gFqETqgprIOUInQARWVZoAlecKfgE1LmWngRx/O699MW+osAYdAFViM3VETYBh4A7SNRm9Yyk8AW/JZA6aAcWBEPuPy3VpHuQlLXSvAnw6bbWnLsEoC4BbQsDy1kwTsH9hs67YlsYafOYbtUawNCNqw77D/1TZyfDn/3WH8N/AkFuP/tmMW+OVox7n3TgBuA98cRpvAA69Gu3dCs8tIGPM54TUcxvQqcNOLscu1a6zLHuPEy8QIvHUYeQdc9+JR/w9n19G+nagGFo0lp5NdlQKAIWDP0ka9RC5FqbxqqfgosXW395FQ976dJthtmTSv4p3vcU7QK4BJI0qlJeMV0MvPrEopwJwsx51sRq10WXZflTQ7f4Hei8jIbUR2vqCgIH8QxPDqcuoKDUhkCQnI7ItP5V6it2ZUJp7jZQJIIMaMRtmjzQSha5MtlVEksmRy6tpTt3LQAS1XwCOMNZVRgGehHsG9sMILlsJTKqMA9y0+PQ4rvGopPK4yCnDX4tPTsMLrlsIjKqMAoxafXuSlA25cpgNW8v4KLORoEpzPyzL4/DLL4FCuN0Iq71thTe4PQyrvx+GCgoICE51ckCTDYRICCE/agYokc5Z9ON+JTjvNqZQSoh7Rab1SlAob/M+5N/WF/+RomGrkMEqlNcKpZyg9Xo0qhGxbKt5TKUDOMDY1ajuykJJAhGjjfcolMtu+jJw4jNSuYk6Qd/7Y0a6PwDWf6tAzh7FmktoBEUKEqUEu+OL9odBdKJmIekQEEKYKJF6hpJFrc42EfRUzItByPfl4c5kEr4NtTjiI1Xhg32b7Q2JzEcHEuGMskXrXtdKDXF6nq2aAOxK3HxW5/Iz8r5tcfsNwXLdh29uE14eQsirnhFKCFyY25ZJGLZIQMgkG+spMLxSXpsj5tbmOaPOpJe9g0hqoi5MmOisDPJJ0/Ev56Lzkw9CMTUGBipO/PzTEfavQK7YAAAAASUVORK5CYII="};
+const glyphPaths = {
+  clock: '<circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/>',
+  star: '<path d="M11.525 2.295a.53.53 0 0 1 .95 0l2.558 5.183a.53.53 0 0 0 .399.29l5.72.831a.53.53 0 0 1 .294.904l-4.14 4.036a.53.53 0 0 0-.153.469l.978 5.697a.53.53 0 0 1-.77.56l-5.116-2.69a.53.53 0 0 0-.49 0l-5.117 2.69a.53.53 0 0 1-.769-.56l.978-5.697a.53.53 0 0 0-.153-.47l-4.14-4.035a.53.53 0 0 1 .294-.904l5.72-.831a.53.53 0 0 0 .4-.29z"/>',
+  check: '<path d="m20 6-11 11-5-5"/>',
+  settle: '<circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/>',
+  mail: '<path d="M21 8a2 2 0 0 1 1 1.7V19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V9.7A2 2 0 0 1 3 8l8-5a2 2 0 0 1 2 0z"/><path d="m22 10-8.97 5.7a2 2 0 0 1-2.06 0L2 10"/>',
+  new: '<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2zM8 10h8m-4-4v8"/>',
+  pin: '<path d="M12 17v5m-7-5h14v-1.76c0-.76-.43-1.46-1.11-1.79l-1.78-.9a2 2 0 0 1-1.11-1.79V7a2 2 0 0 0 0-4H9a2 2 0 0 0 0 4v3.76c0 .76-.43 1.46-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24z"/>',
+  pencil: '<path d="m16 3 5 5M4 15 16 3a2 2 0 0 1 3 0l2 2a2 2 0 0 1 0 3L9 20l-5 1z"/>',
+  refresh: '<path d="M3 12a9 9 0 0 1 15-6l3 3m0-6v6h-6m6 3a9 9 0 0 1-15 6l-3-3m0 6v-6h6"/>',
+  copy: '<rect x="8" y="8" width="12" height="13" rx="2"/><path d="M16 8V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h3"/>',
+  archive: '<rect x="2" y="3" width="20" height="5" rx="1"/><path d="M4 8v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8m-10 4h4"/>',
+};
+const starStates = ["off", "green", "yellow", "blue"];
+const byId = id => document.getElementById(id);
+const projectScope = new Set();
+const projectNames = [...new Set(demo.map(thread => thread.project))];
+const readFilter = byId("read-filter");
+const readStates = ["all", "unread", "read"];
+const readLabels = {all:"All", unread:"Unread", read:"Read"};
+function nextReadState(state) {
+  return readStates[(readStates.indexOf(state) + 1) % readStates.length];
+}
+const projectButtons = [...document.querySelectorAll("[data-project]")];
+const sidebar = document.querySelector(".sidebar");
+const picker = byId("project-picker");
+const menu = byId("row-menu");
+const starFilter = byId("star-filter");
+let filter = "all";
+let starredOnly = false;
+let activeThread = "";
+let menuRow = null;
+let menuPosition = null;
+
+function glyph(name) {
+  return '<svg class="line-icon" viewBox="0 0 24 24" aria-hidden="true">' + glyphPaths[name] + '</svg>';
+}
+function icon(name, classes, label) {
+  const accessibility = label ? 'role="img" aria-label="' + label + '" title="' + label + '"' : 'aria-hidden="true"';
+  return '<span ' + accessibility + ' class="asset ' + classes + '" style="--icon:url(' + icons[name] + ')"></span>';
+}
+function project(thread) {
+  return '<span aria-hidden="true" class="project-icon" style="--project-color:var(--' + thread.color + '-foreground,var(--' + thread.color + '))">' + thread.initials + '</span>';
+}
+function pullRequest(thread) {
+  if (thread.pr === undefined) return "";
+  const merged = thread.prState === "merged";
+  return '<span class="pr" title="' + (merged ? "Merged" : "Open") + ' pull request #' + thread.pr + '">' + icon(merged ? "git-merge" : "git-pull-request-arrow", merged ? "merged" : "open") + thread.pr + '</span>';
+}
+function rowButton(action, label, glyphName, caption = "") {
+  return '<button type="button" data-action="' + action + '" aria-label="' + label + '" title="' + label + '">' + glyph(glyphName) + caption + '</button>';
+}
+function nextStar(state) {
+  return starStates[(starStates.indexOf(state) + 1) % starStates.length];
+}
+function starLabel(state) {
+  return "Star " + state + ". " + (nextStar(state) === "off" ? "Clear star" : "Set " + nextStar(state) + " star");
+}
+function starButton(thread) {
+  const state = thread.star ?? "off";
+  const label = starLabel(state);
+  return '<button type="button" class="star-button" data-action="star" data-star="' + state + '" aria-label="' + label + '" title="' + label + '">' + glyph("star") + '</button>';
+}
+function row(thread) {
+  const claude = thread.provider === "claudeAgent";
+  const provider = icon("provider-" + thread.provider, "provider" + (claude ? " claude" : ""), claude ? "Claude Code" : "Codex");
+  const unread = thread.unread && !thread.shelf;
+  let status = '<span class="age">' + thread.age + '</span>';
+  if (thread.shelf === "working") status = '<span class="status">' + icon("circle-dashed", "working-glyph") + 'Working ' + thread.age + '</span>';
+  if (thread.shelf === "snoozed") status = '<span class="status">' + glyph("clock") + 'Snoozed</span>';
+  if (unread) status = '<span class="status done">' + glyph("settle") + 'Done</span>';
+  const access = thread.title + ", " + thread.project + (unread ? ", Done, unread result" : "");
+  const selected = activeThread === thread.id ? ' aria-current="true"' : '';
+  const classes = "row" + (thread.shelf === "settled" ? " slim" : "") + (thread.unread ? "" : " recede");
+  const start = '<li><div role="button" tabindex="0" data-thread="' + thread.id + '" aria-label="' + access + '"' + selected + ' class="' + classes + '">';
+  const title = '<span class="title">' + thread.title + '</span>';
+  if (thread.shelf === "settled") {
+    const star = hasStar(thread) ? starButton(thread) : "";
+    return start + project(thread) + title + star + status + '</div></li>';
+  }
+  const actions = thread.shelf === "snoozed"
+    ? rowButton("wake", "Wake thread", "clock", "Wake")
+    : rowButton("snooze", "Snooze thread", "clock") + rowButton("settle", "Settle thread", "check", "Settle");
+  return start + '<span class="topline">' + project(thread) + '<span class="project-name">' + thread.project + '</span><span class="status-slot">' + starButton(thread) + '<span class="rest-status">' + status + '</span><span class="row-actions">' + actions + '</span></span></span>' + title + '<span class="meta"><span class="branch">' + thread.branch + '</span>' + pullRequest(thread) + provider + '</span></div></li>';
+}
+function hasStar(thread) {
+  return (thread.star ?? "off") !== "off";
+}
+function inScope(thread) {
+  return (!starredOnly || hasStar(thread)) && (projectScope.size === 0 || projectScope.has(thread.project));
+}
+function renderSection(id, threads) {
+  const container = byId(id);
+  container.hidden = threads.length === 0;
+  container.querySelector(".shelf-count").textContent = threads.length;
+  container.querySelector(".rows").innerHTML = threads.map(row).join("");
+  return !container.hidden;
+}
+function renderShelf(id) {
+  const threads = filter === "all" ? demo.filter(thread => thread.shelf === id && inScope(thread)) : [];
+  return renderSection(id, threads);
+}
+function refresh() {
+  const visible = demo.filter(thread => !thread.shelf && inScope(thread) && (filter === "all" || (filter === "unread" ? thread.unread : !thread.unread)));
+  renderSection("priority", visible.filter(thread => thread.priority));
+  renderSection("other", visible.filter(thread => !thread.priority));
+  const hasShelf = ["working", "snoozed", "settled"].map(renderShelf).some(Boolean);
+  byId("shelves").hidden = !hasShelf;
+  byId("empty").hidden = visible.length > 0 || hasShelf;
+  byId("empty").textContent = starredOnly && projectScope.size === 0 && filter === "all" ? "No starred threads." : "No matching threads.";
+  starFilter.setAttribute("aria-pressed", String(starredOnly));
+  for (const button of projectButtons) button.setAttribute("aria-pressed", String(projectScope.has(button.dataset.project)));
+  readFilter.dataset.state = filter;
+  readFilter.textContent = readLabels[filter];
+  const readLabel = "Read filter: " + readLabels[filter] + ". Switch to " + readLabels[nextReadState(filter)] + ".";
+  readFilter.setAttribute("aria-label", readLabel);
+  readFilter.title = readLabel;
+  for (const checkbox of byId("projects").querySelectorAll("input")) checkbox.checked = projectScope.has(checkbox.value);
+  picker.toggleAttribute("data-filtered", [...projectScope].some(name => !projectButtons.some(button => button.dataset.project === name)));
+  picker.querySelector("summary").title = projectScope.size ? "Projects: " + [...projectScope].join(", ") : "All projects";
+}
+starFilter.innerHTML = glyph("star");
+starFilter.addEventListener("click", () => {
+  starredOnly = !starredOnly;
+  refresh();
+});
+readFilter.addEventListener("click", () => {
+  filter = nextReadState(filter);
+  refresh();
+});
+for (const button of projectButtons) button.addEventListener("click", () => {
+  const name = button.dataset.project;
+  if (projectScope.has(name)) projectScope.delete(name);
+  else projectScope.add(name);
+  refresh();
+});
+byId("projects").innerHTML = projectNames.map(name => '<label><span>' + name + '</span><input type="checkbox" value="' + name + '"></label>').join("");
+byId("projects").addEventListener("change", event => {
+  if (event.target.checked) projectScope.add(event.target.value);
+  else projectScope.delete(event.target.value);
+  refresh();
+});
+byId("clear-projects").addEventListener("click", () => { projectScope.clear(); refresh(); });
+byId("project-search").addEventListener("input", event => {
+  const query = event.target.value.toLowerCase().trim();
+  for (const label of byId("projects").children) label.hidden = !label.textContent.toLowerCase().includes(query);
+});
+picker.addEventListener("keydown", event => {
+  if (event.key === "Escape") {
+    picker.open = false;
+    picker.querySelector("summary").focus();
+  }
+});
+function threadFor(row) {
+  return demo.find(item => item.id === row.dataset.thread);
+}
+function focusRow(id) {
+  const threadRow = sidebar.querySelector('[data-thread="' + id + '"]');
+  const collapsed = threadRow?.closest("details:not([open])");
+  (collapsed?.querySelector("summary") ?? threadRow ?? readFilter).focus();
+}
+function openThread(row) {
+  const thread = threadFor(row);
+  activeThread = thread.id;
+  updateThread(row, {unread:false});
+}
+function updateThread(row, changes) {
+  const thread = threadFor(row);
+  Object.assign(thread, changes);
+  closeMenu();
+  refresh();
+  focusRow(thread.id);
+}
+function cycleStar(row, button) {
+  const thread = threadFor(row);
+  thread.star = nextStar(thread.star ?? "off");
+  button.dataset.star = thread.star;
+  const label = starLabel(thread.star);
+  button.title = label;
+  button.setAttribute("aria-label", label);
+  if (!hasStar(thread) && starredOnly) {
+    refresh();
+    starFilter.focus();
+  } else if (!hasStar(thread) && thread.shelf === "settled") {
+    button.remove();
+    row.focus();
+  }
+}
+function menuItem(action, label, glyphName = "", end = "", disabled = false) {
+  return '<button type="button" role="menuitem" data-menu-action="' + action + '"' + (disabled ? " disabled" : "") + '>' + (glyphName ? glyph(glyphName) : "") + '<span>' + label + '</span>' + (end ? '<span class="menu-end">' + end + '</span>' : "") + '</button>';
+}
+const menuDivider = '<div class="menu-divider" role="separator"></div>';
+function rowMenuContent(thread) {
+  const branch = thread.branch ? menuItem("new", "New thread on " + thread.branch, "new", "", true) : "";
+  return branch + menuItem("pin", "Pin thread", "pin", "", true) +
+    menuItem(thread.shelf === "settled" ? "unsettle" : "settle", thread.shelf === "settled" ? "Un-settle thread" : "Settle thread", "settle") +
+    (thread.shelf === "snoozed" ? menuItem("wake", "Wake thread", "clock") : menuItem("snooze", "Snooze", "clock", "›")) +
+    menuDivider + menuItem("rename", "Rename thread", "pencil", "", true) +
+    menuItem("regenerate", "Regenerate title", "refresh", "", true) +
+    menuItem("unread", "Mark unread", "mail") +
+    menuDivider + menuItem("copy", "Copy", "copy", "›", true) +
+    menuItem("archive", "Archive thread", "archive", "", true);
+}
+function snoozeMenuContent() {
+  return menuItem("snooze-preset", "In 1 hour", "", "14:30") +
+    menuItem("snooze-preset", "In 3 hours", "", "16:30") +
+    menuItem("snooze-preset", "This evening", "", "18:00") +
+    menuItem("snooze-preset", "Tomorrow", "", "09:00") +
+    menuItem("snooze-preset", "Next week", "", "Mon 09:00") +
+    menuDivider + menuItem("custom", "Custom…");
+}
+function positionMenu() {
+  const side = sidebar.getBoundingClientRect();
+  const x = Math.max(7, Math.min(menuPosition.x - side.left, side.width - menu.offsetWidth - 8));
+  const y = Math.max(7, Math.min(menuPosition.y - side.top, side.height - menu.offsetHeight - 8));
+  menu.style.left = x + "px";
+  menu.style.top = y + "px";
+}
+function showMenu(row, kind, position, keepHover = false) {
+  closeMenu();
+  picker.open = false;
+  menuRow = row;
+  menuPosition = position;
+  if (keepHover) row.setAttribute("data-show-actions", "");
+  menu.innerHTML = kind === "snooze" ? snoozeMenuContent() : rowMenuContent(threadFor(row));
+  menu.setAttribute("aria-label", kind === "snooze" ? "Snooze thread" : "Thread actions");
+  menu.hidden = false;
+  positionMenu();
+  menu.querySelector("button:not(:disabled)").focus({preventScroll:true});
+}
+function closeMenu(returnFocus = false) {
+  if (!menuRow) return;
+  const row = menuRow;
+  menu.hidden = true;
+  row.removeAttribute("data-show-actions");
+  menuRow = null;
+  if (returnFocus) row.focus();
+}
+function showRowMenu(row, x, y) {
+  const rect = row.getBoundingClientRect();
+  showMenu(row, "thread", {x:x || rect.left + 12,y:y || rect.top + 24});
+}
+sidebar.addEventListener("contextmenu", event => {
+  const row = event.target.closest("[data-thread]");
+  if (!row) return;
+  event.preventDefault();
+  showRowMenu(row, event.clientX, event.clientY);
+});
+sidebar.addEventListener("keydown", event => {
+  const row = event.target.closest("[data-thread]");
+  if (!row || event.target !== row) return;
+  if (event.key === "ContextMenu" || (event.shiftKey && event.key === "F10")) {
+    event.preventDefault();
+    showRowMenu(row);
+  } else if (event.key === "Enter" || event.key === " ") {
+    event.preventDefault();
+    openThread(row);
+  }
+});
+sidebar.addEventListener("click", event => {
+  const row = event.target.closest("[data-thread]");
+  if (!row) return;
+  const button = event.target.closest("[data-action]");
+  if (!button) {
+    openThread(row);
+    return;
+  }
+  switch (button.dataset.action) {
+    case "star":
+      cycleStar(row, button);
+      break;
+    case "snooze": {
+      const rect = button.getBoundingClientRect();
+      showMenu(row, "snooze", {x:rect.right - 155,y:rect.bottom + 4}, true);
+      break;
+    }
+    case "settle":
+      updateThread(row, {shelf:"settled"});
+      break;
+    case "wake":
+      updateThread(row, {shelf:null});
+      break;
+  }
+});
+menu.addEventListener("click", event => {
+  const action = event.target.closest("[data-menu-action]")?.dataset.menuAction;
+  if (!action || !menuRow) return;
+  if (action === "snooze") {
+    showMenu(menuRow, "snooze", menuPosition);
+  } else if (action === "custom") {
+    menu.innerHTML = '<input aria-label="Snooze until" type="datetime-local">' + menuItem("snooze-preset", "Snooze");
+    positionMenu();
+    menu.querySelector("input").focus();
+  } else if (action === "unread") {
+    updateThread(menuRow, {unread:true});
+  } else if (action === "snooze-preset") {
+    const custom = menu.querySelector("input");
+    if (!custom || custom.value) updateThread(menuRow, {shelf:"snoozed"});
+    else custom.focus();
+  } else {
+    updateThread(menuRow, {shelf:action === "settle" ? "settled" : null});
+  }
+});
+menu.addEventListener("keydown", event => {
+  if (event.key === "Escape") {
+    event.preventDefault();
+    closeMenu(true);
+  } else if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+    if (event.target.matches("input")) return;
+    event.preventDefault();
+    const items = [...menu.querySelectorAll("button:not(:disabled)")];
+    const offset = event.key === "ArrowDown" ? 1 : -1;
+    const index = items.indexOf(document.activeElement);
+    items[(index + offset + items.length) % items.length].focus();
+  }
+});
+document.addEventListener("pointerdown", event => {
+  if (!menu.hidden && !menu.contains(event.target)) closeMenu();
+  if (picker.open && !picker.contains(event.target)) picker.open = false;
+});
+addEventListener("resize", () => { if (menuRow) positionMenu(); });
+refresh();
+</script>
+</body>
+</html>

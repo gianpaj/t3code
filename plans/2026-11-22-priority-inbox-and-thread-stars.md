@@ -7,6 +7,26 @@ finishing a turn, the engineer seeing the result, and the engineer handling the 
 separate events. An open PR can still need a decision after its thread has been read.
 [Research on agent oversight and review](https://arxiv.org/html/2606.05391v1#S4)
 
+## Development slices
+
+Build in this order on one feature branch. Start with web and desktop, put grouping and filter
+rules in the shared client runtime, and verify each slice before moving on.
+
+1. **Priority inbox.** Split Active into two collapsible groups with five Priority rows by
+   default and **Show more**. Verify that a draft PR qualifies, reading its thread leaves it in
+   Priority, and snoozing it moves it out until it wakes.
+2. **Project and read filters.** Wire the three shortcuts and full project picker to one
+   selection. Add one button that cycles through All, Unread, and Read. Verify that the filters
+   combine and that the counts and five-row limit use the filtered rows.
+3. **Thread stars.** Add the persisted color, row control, and Starred filter. Verify that every
+   color matches the filter, ranking stays the same, and stars on older settled threads appear
+   in filtered results.
+4. **Mobile parity.** Apply the shared rules in Home and the workspace sidebar. Verify the
+   touch controls and that a star set on desktop appears on mobile in the same environment.
+
+Run the full inbox flow on desktop and mobile before shipping. Try the Decisions API after the
+rule-based inbox is usable.
+
 ## User-visible behavior
 
 - Split the flat Active list into **Priority** and **Everything else**. Both start expanded,
@@ -17,10 +37,12 @@ separate events. An open PR can still need a decision after its thread has been 
 - Show three project shortcuts using the first three available groups in the existing project
   order. Keep all three visible while the engineer selects projects. The far-right searchable
   picker and the shortcuts update one multi-selection. Clearing it restores all projects.
-  **Unread** and **Read** narrow the active and pinned rows by the existing completion cue.
-  **All** also shows the shelves. The gray **Starred** toggle selects threads with any star and
-  combines with the project and read filters. Green, yellow, and blue are visual choices with
-  equal weight.
+- Use one read-filter button. Start at **All** and cycle **All → Unread → Read → All** on
+  activation. Show only the current state on the button and name the current state and next
+  action in its accessible label. **Unread** and **Read** narrow the active and pinned rows
+  by the existing completion cue. **All** also shows the shelves.
+- The gray **Starred** toggle selects threads with any star and combines with the project
+  and read filters. Green, yellow, and blue are visual choices with equal weight.
 - Add one star button immediately before the **Snooze** clock. An unstarred row shows the
   outline on hover or keyboard focus. A starred row keeps the filled icon at rest, in the same
   position it occupies on hover. Click to cycle off → green → yellow → blue → off. The
@@ -32,7 +54,7 @@ separate events. An open PR can still need a decision after its thread has been 
   and their existing behavior. The last-navigation timestamp and any redesign of row metadata
   are separate work.
 
-## 1. Add a durable star
+## Add a durable star
 
 - Add nullable `starColor` to thread state and the shell projection in
   [orchestrationV2.ts](../packages/contracts/src/orchestrationV2.ts). Use one absolute-value
@@ -53,8 +75,11 @@ separate events. An open PR can still need a decision after its thread has been 
   retry sends the same value with the same command ID. Preserve the star when a thread moves
   between shelves. When an engineer clears a star in Starred, remove the row from the filtered
   list and keep keyboard focus in the list or on the filter.
+- Reuse the existing older-Settled query for starred history. Apply the star predicate to its
+  page and count so a thread stays findable after it leaves the initial shell window.
+  [Older settled queries](../packages/client-runtime/src/state/olderSettledThreads.ts)
 
-## 2. Derive Priority from the active list
+## Derive Priority from the active list
 
 - Start with the existing partition and order. Within Active, promote threads with an explicit
   pending approval or answer request and threads with a known open PR attached, including drafts.
@@ -76,11 +101,9 @@ separate events. An open PR can still need a decision after its thread has been 
   [Settlement service](../apps/server/src/orchestration-v2/ThreadSettlementService.ts)
 - Show up to five Priority rows by default when expanded. Show a count for the full filtered
   group and **Show more** for the remaining rows. Each thread has one row. Apply all active
-  filters before counting. Reuse the existing older-Settled query for starred history and apply
-  the star predicate to its page and count, so a thread stays findable after it leaves the
-  initial shell window. [Older settled queries](../packages/client-runtime/src/state/olderSettledThreads.ts)
+  filters before counting.
 
-## 3. Wire the clients to the same behavior
+## Wire the clients to the same behavior
 
 - **Web and desktop.** Extend the existing collapsible section header and list markers. Add both
   toggles to the sidebar expansion key so a click behaves like collapsing Working or Settled.
@@ -114,11 +137,11 @@ separate events. An open PR can still need a decision after its thread has been 
   approval, and an open PR thread being snoozed and returning. Extend server tests for command
   permission, retry, projection replay, and starred-only settled pagination.
 - Verify in an isolated web or desktop client and in the native client. Cover collapse and
-  reopen, a narrowed project scope, gray filter on and off, filled star at rest, keyboard and
-  touch, Mark unread while viewing a thread, Snooze opening beside the star, route reveal, mixed
-  environments, and a large list of old settled threads. Run focused tests and the changed-file
-  check before shipping. Add translations for the new controls and a short entry in the
-  [thread sidebar guide](../docs/user/thread-sidebar.md).
+  reopen, a narrowed project scope, the read filter cycling back to All, the Starred toggle,
+  filled star at rest, keyboard and touch, Mark unread while viewing a thread, Snooze opening
+  beside the star, route reveal, mixed environments, and a large list of old settled threads.
+  Run focused tests and the changed-file check before shipping. Add translations for the new
+  controls and a short entry in the [thread sidebar guide](../docs/user/thread-sidebar.md).
 - Use the deterministic rules as a baseline. Then test the Decisions API on completed turns with
   no explicit priority signal. Key each suggestion to the completed run so rereads and
   reconnections leave it stable. Compare suggestions with the engineer’s assessment and retain

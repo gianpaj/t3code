@@ -4,6 +4,7 @@ import * as Effect from "effect/Effect";
 import * as Option from "effect/Option";
 import { AsyncResult, Atom, type AtomRegistry } from "effect/reactivity";
 import {
+  ORCHESTRATION_V2_WS_METHODS,
   WS_METHODS,
   type EnvironmentId,
   type OrchestrationV2ShellSnapshot,
@@ -49,6 +50,7 @@ import {
   pinThread,
   reorderPinnedThread,
   reorderActiveThread,
+  setThreadStar,
   setThreadAutoSettle,
   settleThread,
   snoozeThread,
@@ -280,6 +282,13 @@ export function createThreadEnvironmentAtoms<R, E>(
     reorderActive: createEnvironmentCommand(runtime, {
       label: "environment-data:commands:thread:reorder-active",
       execute: reorderActiveThread,
+      scheduler,
+      concurrency,
+    }),
+    setStar: createEnvironmentRpcCommand(runtime, {
+      label: "environment-data:commands:thread:set-star",
+      tag: ORCHESTRATION_V2_WS_METHODS.dispatchCommand,
+      execute: setThreadStar,
       scheduler,
       concurrency,
     }),

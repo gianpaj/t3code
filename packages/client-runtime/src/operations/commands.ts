@@ -648,6 +648,12 @@ export const reorderActiveThread = Effect.fn("EnvironmentCommands.reorderActiveT
   });
 });
 
+export const setThreadStar = Effect.fn("EnvironmentCommands.setThreadStar")(function* (
+  command: Extract<OrchestrationV2Command, { type: "thread.star.set" }>,
+) {
+  return yield* resendAfterSocketLoss(dispatch(command));
+});
+
 export const unpinThread = Effect.fn("EnvironmentCommands.unpinThread")(function* (
   input: UnpinThreadInput,
 ) {

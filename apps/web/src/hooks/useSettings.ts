@@ -51,7 +51,11 @@ import { AsyncResult, Atom } from "effect/reactivity";
 import { toastManager } from "~/components/ui/toast";
 import { isHostedStaticApp } from "~/hostedPairing";
 import { environmentCatalog } from "~/connection/catalog";
-import { primaryServerSettingsAtom, serverEnvironment } from "~/state/server";
+import {
+  primaryServerSettingsAtom,
+  serverEnvironment,
+  threadStarsAvailableAtom,
+} from "~/state/server";
 import { useEnvironments, usePrimaryEnvironment } from "~/state/environments";
 import { useAtomCommand } from "~/state/use-atom-command";
 import { useTheme } from "./useTheme";
@@ -332,6 +336,12 @@ export function useClientSettings<T = ClientSettings>(
     selector ?? (selectWholeClientSettings as (settings: ClientSettings) => T),
     Equal.equals,
   );
+}
+
+export function useThreadStarsEnabled(): boolean {
+  const enabled = useClientSettings((settings) => settings.threadStarsEnabled);
+  const available = useAtomValue(threadStarsAvailableAtom);
+  return enabled && available;
 }
 
 export function mergeEnvironmentSettings(

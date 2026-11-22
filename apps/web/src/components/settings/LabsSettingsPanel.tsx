@@ -1,5 +1,6 @@
 import { managedCapabilityDenial } from "@t3tools/client-runtime/contract-labels";
 import { useAuth } from "@clerk/react";
+import { useAtomValue } from "@effect/atom-react";
 import { Link } from "@tanstack/react-router";
 import { T, useGT, useMessages } from "gt-react";
 
@@ -13,6 +14,7 @@ import { useSearchableSetting } from "./settingsSearch";
 import { useScopedSettings, useUpdateScopedSettings } from "./useScopedSettings";
 import { useOptionalSettingsScope, useSettingsScope } from "./SettingsScopeContext";
 import { firstManagedDenial, usePrimaryManagedPolicy } from "~/state/managedPolicy";
+import { threadStarsAvailableAtom } from "~/state/server";
 
 /** Features still settling in. */
 export function LabsSettingsPanel() {
@@ -59,14 +61,19 @@ function PriorityInboxRow() {
 function ThreadStarsRow() {
   const searchableSetting = useSearchableSetting();
   const enabled = useScopedSettings((settings) => settings.threadStarsEnabled);
+  const available = useAtomValue(threadStarsAvailableAtom);
   const updateSettings = useUpdateScopedSettings();
   const gt = useGT();
   return (
     <SettingsRow
       {...searchableSetting("thread-stars")}
-      description={gt(
-        "Try colored stars in place of pins. Your pinned threads return when you turn this off.",
-      )}
+      description={
+        available
+          ? gt(
+              "Try colored stars in place of pins. Your pinned threads return when you turn this off.",
+            )
+          : gt("Update the connected T3 Code servers to use Thread stars.")
+      }
       control={
         <Switch
           checked={enabled}

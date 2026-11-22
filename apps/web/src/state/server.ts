@@ -45,6 +45,13 @@ export const environmentServerConfigsAtom = createEnvironmentServerConfigsAtom({
   catalogValueAtom: environmentCatalog.catalogValueAtom,
   serverConfigValueAtom: serverEnvironment.configValueAtom,
 });
+export const threadStarsAvailableAtom = Atom.make((get) => {
+  const configs = get(environmentServerConfigsAtom);
+  return (
+    configs.size > 0 &&
+    [...configs.values()].every((config) => config.environment.capabilities.threadStars === true)
+  );
+}).pipe(Atom.withLabel("web-thread-stars-available"));
 
 interface PrimaryServerState {
   readonly config: ServerConfig | null;

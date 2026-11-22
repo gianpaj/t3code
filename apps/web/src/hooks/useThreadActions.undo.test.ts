@@ -46,7 +46,10 @@ vi.mock("react", async (original) => ({
   useRef: (value: unknown) => ({ current: value }),
 }));
 vi.mock("@tanstack/react-router", () => ({ useRouter: () => router }));
-vi.mock("./useSettings", () => ({ useClientSettings: () => false }));
+vi.mock("./useSettings", () => ({
+  useClientSettings: () => false,
+  useThreadStarsEnabled: () => false,
+}));
 vi.mock("./useHandleNewThread", () => ({
   useNewThreadHandler: () => async () => {
     router.state.location.href = "/draft/project";

@@ -78,6 +78,7 @@ If you use the Boring sidebar, threads stay grouped in project folders and the f
 are available above them.
 
 Turn on **Thread stars** in the same Beta section to replace pins with colored stars.
+The connected T3 Code servers need to support Thread stars.
 Existing pins start green and keep their order at the top. Click a star to cycle through
 green, yellow, and blue, then clear it. The pin shortcut cycles the star in the current
 thread. On touch screens, use the thread menu. The **Starred** filter shows any color,

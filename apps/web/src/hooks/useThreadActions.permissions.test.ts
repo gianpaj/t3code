@@ -192,6 +192,7 @@ vi.mock("../components/ui/toast", () => ({
 }));
 vi.mock("./useHandleNewThread", () => ({ useNewThreadHandler: () => async () => {} }));
 vi.mock("./useSettings", () => ({
+  useThreadStarsEnabled: () => false,
   useClientSettings: (select: (settings: unknown) => unknown) =>
     select({
       sidebarThreadSortOrder: "createdAt",

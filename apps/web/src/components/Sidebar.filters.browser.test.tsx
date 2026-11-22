@@ -69,9 +69,15 @@ it("gates the Priority inbox and its filters behind the Labs switch", async () =
     };
   };
   const ordinary = threadWithHistory("ordinary", 1);
+  const pinned = {
+    ...threadWithHistory("legacy-pin", 1),
+    projectId: projects[0]!.id,
+    pinnedAt: DateTime.makeUnsafe(at),
+  };
   using _environment = installFakeEnvironment(
     [
       ordinary,
+      pinned,
       ...Array.from({ length: 6 }, (_, index) => priority(`unread-${index}`, index + 1, true)),
       priority("read", 7, false),
       priority("docs-one", 8, true, projects[2]!.id),
@@ -103,6 +109,7 @@ it("gates the Priority inbox and its filters behind the Labs switch", async () =
   const starredFilter = screen.getByRole("button", { name: "Starred", exact: true });
   const picker = screen.getByRole("combobox", { name: /^Filter threads by project/ });
   const labsSwitch = page.getByRole("switch", { name: "Priority inbox" });
+  const starsSwitch = page.getByRole("switch", { name: "Thread stars" });
   const activeRows = () => screen.container.querySelectorAll('[data-testid="sidebar-row-card"]');
   const priorityRows = () =>
     screen.container.querySelectorAll(
@@ -114,7 +121,7 @@ it("gates the Priority inbox and its filters behind the Labs switch", async () =
   };
 
   await expect.element(picker).toBeVisible();
-  await vi.waitFor(() => expect(activeRows()).toHaveLength(10));
+  await vi.waitFor(() => expect(activeRows()).toHaveLength(11));
   await expect.element(readFilter).not.toBeInTheDocument();
   await expect.element(starredFilter).not.toBeInTheDocument();
   await expect.element(renderProject).not.toBeInTheDocument();
@@ -122,12 +129,19 @@ it("gates the Priority inbox and its filters behind the Labs switch", async () =
 
   await router.navigate({ to: "/settings/labs" });
   await expect.element(labsSwitch).not.toBeChecked();
-  await expect.element(page.getByRole("switch", { name: "Thread stars" })).not.toBeChecked();
+  await expect.element(starsSwitch).not.toBeChecked();
+  await expect
+    .element(page.getByText("Update the connected T3 Code servers to use Thread stars."))
+    .toBeVisible();
+  await userEvent.click(starsSwitch);
+  await expect.element(starsSwitch).toBeChecked();
   await userEvent.click(labsSwitch);
   await expect.element(labsSwitch).toBeChecked();
   await router.navigate({ href: threadPath });
 
   await expect.element(starredFilter).not.toBeInTheDocument();
+  const pinnedRow = screen.getByTestId("sidebar-row-card").filter({ hasText: pinned.title });
+  await expect.element(pinnedRow.getByRole("button", { name: "Unpin thread" })).toBeInTheDocument();
   await expectPriority(9, 5);
   await expect.element(otherHeader).toHaveTextContent("Everything else1");
   await userEvent.click(renderProject);
@@ -185,5 +199,5 @@ it("gates the Priority inbox and its filters behind the Labs switch", async () =
   await expect.element(readFilter).not.toBeInTheDocument();
   await expect.element(starredFilter).not.toBeInTheDocument();
   await expect.element(priorityHeader).not.toBeInTheDocument();
-  await vi.waitFor(() => expect(activeRows()).toHaveLength(10));
+  await vi.waitFor(() => expect(activeRows()).toHaveLength(11));
 });

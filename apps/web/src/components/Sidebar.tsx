@@ -3235,7 +3235,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
                   {projectShortcuts.map((project) => {
                     const selected = projectScopeKeys.includes(project.projectKey);
                     return (
-                      <div key={project.projectKey} className="min-w-0 flex-1">
+                      <div key={project.projectKey}>
                         <SidebarMenuButton
                           type="button"
                           size="sm"

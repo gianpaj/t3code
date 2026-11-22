@@ -11,6 +11,7 @@ import {
   createInboxReturnTracker,
   groupPriorityInbox,
   isThreadWorking,
+  matchesThreadReadFilter,
   sortInboxThreadsByReturn,
   sortWorkingThreadsBySend,
 } from "./threadInbox.ts";
@@ -41,7 +42,7 @@ function thread(id: string, working: boolean) {
   };
 }
 
-it("keeps an open draft in Priority and orders pending requests first", () => {
+it("keeps a seen open draft in Priority and orders pending requests first", () => {
   const completedAt = "2026-06-01T00:10:00.000Z";
   const draft: ThreadPullRequestLink = {
     host: "github.com",
@@ -63,6 +64,15 @@ it("keeps an open draft in Priority and orders pending requests first", () => {
   };
   const review = {
     ...thread("review", false),
+    latestRun: {
+      runId: RunId.make("review"),
+      status: "completed" as const,
+      requestedAt: completedAt,
+      startedAt: completedAt,
+      completedAt,
+      assistantMessageId: null,
+    },
+    lastVisitedAt: completedAt,
     pullRequests: [draft],
   };
   const question = { ...thread("question", false), hasPendingUserInput: true, pullRequests: [] };
@@ -77,6 +87,14 @@ it("keeps an open draft in Priority and orders pending requests first", () => {
     pullRequests: [{ ...draft, snapshot: null }],
   };
 
+  expect(matchesThreadReadFilter(review, "read", "2026-06-01T00:00:00.000Z")).toBe(true);
+  expect(
+    matchesThreadReadFilter(
+      { ...review, lastVisitedAt: undefined },
+      "unread",
+      "2026-06-01T00:00:00.000Z",
+    ),
+  ).toBe(true);
   expect(groupPriorityInbox([review, merged, question, unknown], () => false)).toEqual({
     priority: [question, review],
     other: [merged, unknown],

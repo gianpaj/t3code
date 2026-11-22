@@ -3,6 +3,51 @@ import { threadRuntimeIsActive, type EnvironmentThreadShell } from "./models.ts"
 import { toSortableTimestamp } from "./threadSort.ts";
 import { effectiveSnoozed } from "./threadSettled.ts";
 
+export type ThreadReadFilter = "all" | "unread" | "read";
+
+export const nextThreadReadFilter = {
+  all: "unread",
+  unread: "read",
+  read: "all",
+} as const satisfies Record<ThreadReadFilter, ThreadReadFilter>;
+
+export function resolveThreadLastVisitedAt(
+  serverLastVisitedAt: string | null | undefined,
+  localLastVisitedAt: string | undefined,
+): string | undefined {
+  return serverLastVisitedAt === undefined
+    ? localLastVisitedAt
+    : (serverLastVisitedAt ?? undefined);
+}
+
+type CompletionInput = Pick<EnvironmentThreadShell, "latestRun"> & {
+  readonly lastVisitedAt?: string | null | undefined;
+};
+
+export function hasUnseenCompletion(thread: CompletionInput): boolean {
+  if (!thread.latestRun?.completedAt) return false;
+  if (thread.latestRun.status === "interrupted" || thread.latestRun.status === "cancelled") {
+    return false;
+  }
+  const completedAt = Date.parse(thread.latestRun.completedAt);
+  if (Number.isNaN(completedAt) || !thread.lastVisitedAt) return false;
+  const lastVisitedAt = Date.parse(thread.lastVisitedAt);
+  return Number.isNaN(lastVisitedAt) || completedAt > lastVisitedAt;
+}
+
+export function matchesThreadReadFilter(
+  thread: CompletionInput,
+  filter: ThreadReadFilter,
+  localLastVisitedAt: string | undefined,
+): boolean {
+  if (filter === "all") return true;
+  const unread = hasUnseenCompletion({
+    latestRun: thread.latestRun,
+    lastVisitedAt: resolveThreadLastVisitedAt(thread.lastVisitedAt, localLastVisitedAt),
+  });
+  return unread === (filter === "unread");
+}
+
 type PriorityThreadInput = Pick<
   EnvironmentThreadShell,
   "hasPendingApprovals" | "hasPendingUserInput" | "pendingSubagentRequest" | "pullRequests"

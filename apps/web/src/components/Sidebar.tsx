@@ -37,7 +37,10 @@ import {
   createInboxReturnTracker,
   groupPriorityInbox,
   isThreadWorking,
+  matchesThreadReadFilter,
+  nextThreadReadFilter,
   PRIORITY_INBOX_LIMIT,
+  type ThreadReadFilter,
 } from "@t3tools/client-runtime/state/thread-inbox";
 import { sortSettledThreads } from "@t3tools/client-runtime/state/thread-sort";
 import {
@@ -258,7 +261,7 @@ import {
   ComboboxTrigger,
   useComboboxFilter,
 } from "./ui/combobox";
-import { SidebarContent, SidebarGroup, useSidebar } from "./ui/sidebar";
+import { SidebarContent, SidebarGroup, SidebarMenuButton, useSidebar } from "./ui/sidebar";
 import { SidebarChromeFooter, SidebarChromeHeader } from "./sidebar/SidebarChrome";
 import { SidebarHeaderIconButton, SidebarThreadHeader } from "./sidebar/SidebarThreadHeader";
 import { TooltipProvider } from "./ui/tooltip";
@@ -436,6 +439,7 @@ function routeThreadOnly(
 function useSidebarThreads(input: {
   readonly projectScopeKey: string | null;
   readonly scopedProjectKeys: ReadonlySet<string> | null;
+  readonly readFilter: ThreadReadFilter;
   readonly serverConfigs: ReadonlyMap<EnvironmentId, EnvironmentServerConfig>;
   readonly connectedEnvironmentIds: readonly EnvironmentId[];
   readonly optimisticDrop: SidebarOptimisticDrop | null;
@@ -451,6 +455,7 @@ function useSidebarThreads(input: {
   const {
     projectScopeKey,
     scopedProjectKeys,
+    readFilter,
     serverConfigs,
     connectedEnvironmentIds,
     optimisticDrop,
@@ -497,7 +502,7 @@ function useSidebarThreads(input: {
     true,
     Schema.Boolean,
   );
-  const priorityScope = projectScopeKey;
+  const priorityScope = JSON.stringify([projectScopeKey, readFilter]);
   const [priorityTail, setPriorityTail] = useState({ scope: priorityScope, showAll: false });
   if (priorityTail.scope !== priorityScope) {
     setPriorityTail({ scope: priorityScope, showAll: false });
@@ -528,8 +533,25 @@ function useSidebarThreads(input: {
     clockKey: `${nowMinute}:${snoozeWakeClock}:${inboxReturnsVersion}`,
   });
 
-  const { pinnedThreads, activeThreads, workingThreads, snoozedThreads, settledThreads } =
-    partition;
+  const showShelves = readFilter === "all";
+  const localThreadVisits = useUiStateStore((state) =>
+    showShelves ? null : state.threadLastVisitedAtById,
+  );
+  const inReadFilter = (thread: EnvironmentThreadShell) =>
+    matchesThreadReadFilter(
+      thread,
+      readFilter,
+      thread.lastVisitedAt === undefined ? localThreadVisits?.[threadShellKey(thread)] : undefined,
+    );
+  const pinnedThreads = showShelves
+    ? partition.pinnedThreads
+    : partition.pinnedThreads.filter(inReadFilter);
+  const activeThreads = showShelves
+    ? partition.activeThreads
+    : partition.activeThreads.filter(inReadFilter);
+  const workingThreads = showShelves ? partition.workingThreads : EMPTY_THREADS;
+  const snoozedThreads = showShelves ? partition.snoozedThreads : EMPTY_THREADS;
+  const settledThreads = showShelves ? partition.settledThreads : EMPTY_THREADS;
   const openBranchPullRequests = useOpenBranchPullRequests(
     folderGroups === null ? activeThreads : EMPTY_THREADS,
   );
@@ -549,8 +571,8 @@ function useSidebarThreads(input: {
     : routeThreadOnly(otherThreads, routeRowThreadKey);
   // Older settled threads load in pages; the shelf lists them only as far as they are loaded.
   const olderSettledShelf = useOlderSettledShelf({
-    scopes: olderSettledScopes([...serverConfigs.keys()], scopedProjectKeys),
-    expanded: settledShelfExpanded,
+    scopes: showShelves ? olderSettledScopes([...serverConfigs.keys()], scopedProjectKeys) : [],
+    expanded: showShelves && settledShelfExpanded,
     visibleCount: settledVisibleCount,
   });
   const listedSettledThreads = settledThreads.filter(olderSettledShelf.isListed);
@@ -582,7 +604,11 @@ function useSidebarThreads(input: {
   const projectFolders =
     folderGroups === null
       ? null
-      : groupSidebarThreadsByProject(folderGroups, activeThreads, keepEmpty).map((folder) => {
+      : groupSidebarThreadsByProject(
+          folderGroups,
+          activeThreads,
+          showShelves ? keepEmpty : () => false,
+        ).map((folder) => {
           const collapsed = !resolveProjectExpanded(
             projectExpandedById,
             sidebarFolderExpansionKeys(folder.group),
@@ -620,6 +646,11 @@ function useSidebarThreads(input: {
   }
   return {
     ...partition,
+    pinnedThreads,
+    activeThreads,
+    workingThreads,
+    snoozedThreads,
+    settledThreads,
     threads,
     workingShelfEnabled,
     prioritySection: {
@@ -651,7 +682,7 @@ function useSidebarThreads(input: {
         scopeKey: current.scopeKey,
         count: current.count + SETTLED_TAIL_PAGE_COUNT,
       })),
-    settledShelfExpanded,
+    settledShelfExpanded: showShelves && settledShelfExpanded,
     toggleSettledShelf: () => setSettledShelfExpanded((value) => !value),
     snoozedShelfExpanded,
     toggleSnoozedShelf: () => setSnoozedShelfExpanded((value) => !value),
@@ -671,7 +702,7 @@ function useSidebarThreads(input: {
     snoozedThreadKeys: new Set(snoozedThreads.map(threadShellKey)),
     sectionByThreadKey,
     pinnedKeys: pinnedThreads.map(threadShellKey),
-    activeKeys: activeThreads.map(threadShellKey),
+    activeKeys: partition.activeThreads.map(threadShellKey),
     pinnedKeysById: new Map(
       threads.map((thread) => [threadShellKey(thread), thread.pinOrderKey ?? null] as const),
     ),
@@ -1082,11 +1113,13 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
   const allProjectConfigsReady = useAtomValue(environmentProjects.projectConfigsReadyAtom);
   // Safari may click after Ctrl+click opens settings; suppress that selection until the picker reopens.
   const suppressNextScopeChangeRef = useRef(false);
+  const projectScopeTriggerRef = useRef<HTMLButtonElement>(null);
   const highlightedProjectScopeKeyRef = useRef<string | null>(null);
   // Hold dropped rows until server placement is confirmed; block another pickup from replacing the hold.
   const [optimisticDrop, setOptimisticDrop] = useState<SidebarOptimisticDrop | null>(null);
   const threadSearchInputRef = useRef<HTMLInputElement>(null);
   const [threadSearchQuery, setThreadSearchQuery] = useState("");
+  const [readFilter, setReadFilter] = useState<ThreadReadFilter>("all");
   const [searchHighlightKey, setSearchHighlightKey] = useState<string | null>(null);
   const connectedEnvironmentIds = useConnectedEnvironmentIds();
   const queuePendingFileDrop = useSidebarPendingFileDropStore((s) => s.queuePendingFileDrop);
@@ -1235,11 +1268,9 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
     (item) => item.value,
     projectScopeMenuState.open,
   );
-  const selectedProjectScopeItem =
-    projectScopeKeys.length > 1
-      ? null
-      : (projectScopeItems.find((item) => item.value === (projectScopeKeys[0] ?? "all")) ??
-        projectScopeItems[0]!);
+  const selectedProjectScopeItems = projectScopeItems.filter((item) =>
+    item.value === "all" ? projectScopeKeys.length === 0 : projectScopeKeys.includes(item.value),
+  );
   const filteredProjectScopeItems = filterSidebarProjectScopeItems({
     items: projectScopeItems,
     query: projectScopeMenuState.query,
@@ -1408,6 +1439,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
   } = useSidebarThreads({
     projectScopeKey,
     scopedProjectKeys,
+    readFilter,
     serverConfigs,
     connectedEnvironmentIds,
     optimisticDrop,
@@ -2079,10 +2111,11 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
       items.push({ kind: "marker", marker: "snoozed-header" });
       items.push(...rowsOf(visibleSnoozedThreads, "snoozed"));
     }
-    items.push({ kind: "marker", marker: "settled-header" });
-    const settledRows = rowsOf(renderedSettledThreads, "settled");
-    items.push({ kind: "marker", marker: "settled-placeholder" });
-    items.push(...settledRows);
+    if (readFilter === "all") {
+      items.push({ kind: "marker", marker: "settled-header" });
+      items.push({ kind: "marker", marker: "settled-placeholder" });
+      items.push(...rowsOf(renderedSettledThreads, "settled"));
+    }
     return items;
   })();
   // Preserve the list while streamed updates leave order unchanged to retain row memoization.
@@ -3137,6 +3170,13 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
       ? shortcutLabelForCommand(keybindings, "chat.newLocal")
       : undefined);
   const newThreadInProjectShortcutLabel = shortcutLabelForCommand(keybindings, "chat.newLocal");
+  const projectShortcuts = scopeGroups.slice(0, 3);
+  const readFilterLabels = {
+    all: gt("All", { $context: "thread read filter" }),
+    unread: gt("Unread", { $context: "thread read filter" }),
+    read: gt("Read", { $context: "thread read filter" }),
+  };
+  const nextReadFilter = nextThreadReadFilter[readFilter];
   return (
     <SidebarFolderDrop>
       <SidebarChromeHeader isElectron={isElectron} />
@@ -3147,8 +3187,71 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
           <SidebarGroup className="z-[1]">
             <SidebarThreadHeader
               hasProjects={projectGroups.length > 0}
-              projectScope={
+              onNewProject={openAddProjectCommandPalette}
+              onNewThread={handleNewThreadClick}
+              newThreadDisabled={projects.length === 0}
+              newThreadShortcutLabel={newThreadShortcutLabel}
+              newThreadInProjectShortcutLabel={newThreadInProjectShortcutLabel}
+              showNewThreadInProjectHint={
+                !shouldCreateNewThreadInCurrentProject(
+                  false,
+                  scopeGroups.length,
+                  projectGroups.length,
+                )
+              }
+              searchInputRef={threadSearchInputRef}
+              searchQuery={threadSearchQuery}
+              onSearchQueryChange={(value) => {
+                setThreadSearchQuery(value);
+                setSearchHighlightKey(null);
+              }}
+              onSearchKeyDown={handleThreadSearchKeyDown}
+              isSearching={isSearchingThreads}
+              searchResultCount={threadSearchResults.length}
+              activeSearchResultIndex={activeSearchResultIndex}
+              onClearSearch={clearThreadSearch}
+            />
+            {projectGroups.length > 0 ? (
+              <div className="flex min-w-0 items-center gap-1">
+                <div className="shrink-0">
+                  <SidebarMenuButton
+                    type="button"
+                    size="sm"
+                    isActive={readFilter !== "all"}
+                    aria-label={gt("Read filter: {current}. Switch to {next}.", {
+                      current: readFilterLabels[readFilter],
+                      next: readFilterLabels[nextReadFilter],
+                    })}
+                    onClick={() => {
+                      clearSelection();
+                      setReadFilter(nextReadFilter);
+                      scrollSidebarToTop(sidebarContentRef.current);
+                    }}
+                  >
+                    <span>{readFilterLabels[readFilter]}</span>
+                  </SidebarMenuButton>
+                </div>
+                <div className="flex min-w-0 flex-1 items-center gap-1">
+                  {projectShortcuts.map((project) => {
+                    const selected = projectScopeKeys.includes(project.projectKey);
+                    return (
+                      <div key={project.projectKey} className="min-w-0 flex-1">
+                        <SidebarMenuButton
+                          type="button"
+                          size="sm"
+                          isActive={selected}
+                          aria-pressed={selected}
+                          title={project.displayName}
+                          onClick={() => toggleProjectScopeKey(project.projectKey)}
+                        >
+                          <span>{project.displayName}</span>
+                        </SidebarMenuButton>
+                      </div>
+                    );
+                  })}
+                </div>
                 <Combobox
+                  multiple
                   items={projectScopeItems}
                   filteredItems={filteredProjectScopeItems}
                   autoHighlight
@@ -3163,30 +3266,30 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
                   onItemHighlighted={(item) => {
                     highlightedProjectScopeKeyRef.current = item?.value ?? null;
                   }}
-                  value={selectedProjectScopeItem}
-                  onValueChange={(item, eventDetails) => {
+                  value={selectedProjectScopeItems}
+                  onValueChange={(items, eventDetails) => {
                     if (suppressNextScopeChangeRef.current) {
                       suppressNextScopeChangeRef.current = false;
+                      eventDetails.cancel();
                       return;
                     }
-                    if (!item) return;
-                    if (item.value === "all") {
-                      setProjectScopeKeys([]);
-                    } else if (
-                      eventDetails.event instanceof MouseEvent &&
-                      eventDetails.event.shiftKey
-                    ) {
-                      // Canceling skips Base UI's commit, which would freeze the search query, and its close.
-                      eventDetails.cancel();
-                      toggleProjectScopeKey(item.value);
-                    } else {
-                      setProjectScopeKeys([item.value]);
-                    }
+                    setProjectScopeKeys(
+                      projectScopeKeys.length > 0 && items.some((item) => item.value === "all")
+                        ? []
+                        : items.filter((item) => item.value !== "all").map((item) => item.value),
+                    );
                   }}
                 >
                   <ComboboxTrigger
+                    ref={projectScopeTriggerRef}
                     render={
                       <SidebarHeaderIconButton
+                        isActive={scopedProjectGroups.some(
+                          (project) =>
+                            !projectShortcuts.some(
+                              (shortcut) => shortcut.projectKey === project.projectKey,
+                            ),
+                        )}
                         label={
                           scopedProjectGroups.length > 0
                             ? gt("Filter threads by project: {projects}", {
@@ -3199,32 +3302,12 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
                       />
                     }
                   >
-                    {scopedProjectGroups.length > 1 ? (
-                      <span className="flex shrink-0">
-                        {scopedProjectGroups.slice(0, 2).map((project, index) => (
-                          <span
-                            key={project.projectKey}
-                            className={
-                              index === 0
-                                ? "flex"
-                                : "-ml-1 flex rounded-[25%] bg-sidebar ring-2 ring-sidebar"
-                            }
-                          >
-                            <ProjectFavicon project={project} className="size-3.5" />
-                          </span>
-                        ))}
-                      </span>
-                    ) : scopedProjectGroups[0] ? (
-                      <span className="flex shrink-0">
-                        <ProjectFavicon project={scopedProjectGroups[0]} className="size-4" />
-                      </span>
-                    ) : (
-                      <ListFilterIcon className="size-4" />
-                    )}
+                    <ListFilterIcon className="size-4" />
                   </ComboboxTrigger>
                   {/* Refocusing the trigger after a pointer close shows its focus ring and opens its tooltip. */}
                   <ComboboxPopup
-                    align="start"
+                    anchor={projectScopeTriggerRef}
+                    align="end"
                     collisionAvoidance={{ side: "flip", align: "shift" }}
                     className="w-[min(18rem,var(--available-width))] overflow-hidden"
                     finalFocus={(closeType) => closeType === "keyboard"}
@@ -3290,9 +3373,6 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
                             key={item.value}
                             hideIndicator
                             value={item}
-                            aria-selected={isSelected}
-                            // The icon badge marks selection; Base UI's single value would shade one row.
-                            data-selected={undefined}
                             onContextMenu={(event) => {
                               if (project) handleProjectSettings(event, project);
                             }}
@@ -3355,31 +3435,8 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
                     </ComboboxList>
                   </ComboboxPopup>
                 </Combobox>
-              }
-              onNewProject={openAddProjectCommandPalette}
-              onNewThread={handleNewThreadClick}
-              newThreadDisabled={projects.length === 0}
-              newThreadShortcutLabel={newThreadShortcutLabel}
-              newThreadInProjectShortcutLabel={newThreadInProjectShortcutLabel}
-              showNewThreadInProjectHint={
-                !shouldCreateNewThreadInCurrentProject(
-                  false,
-                  scopeGroups.length,
-                  projectGroups.length,
-                )
-              }
-              searchInputRef={threadSearchInputRef}
-              searchQuery={threadSearchQuery}
-              onSearchQueryChange={(value) => {
-                setThreadSearchQuery(value);
-                setSearchHighlightKey(null);
-              }}
-              onSearchKeyDown={handleThreadSearchKeyDown}
-              isSearching={isSearchingThreads}
-              searchResultCount={threadSearchResults.length}
-              activeSearchResultIndex={activeSearchResultIndex}
-              onClearSearch={clearThreadSearch}
-            />
+              </div>
+            ) : null}
           </SidebarGroup>
         }
       >
@@ -3492,6 +3549,8 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
                     <T>Add project</T>
                   </button>
                 </>
+              ) : readFilter !== "all" ? (
+                <T>No matching threads.</T>
               ) : scopedProjectGroups.length > 0 ? (
                 <>
                   <span>

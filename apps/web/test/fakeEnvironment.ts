@@ -225,6 +225,9 @@ function run(
 }
 
 export interface FakeThread {
+  readonly projectId?: ProjectId;
+  readonly pullRequests?: OrchestrationV2ThreadShell["pullRequests"];
+  readonly lastVisitedAt?: OrchestrationV2ThreadShell["lastVisitedAt"];
   /** Makes this a side chat of that thread. */
   readonly sideChatOf?: ThreadId;
   /** Makes this a subagent the provider started under that thread, which takes no messages. */
@@ -318,7 +321,7 @@ function shellOf(thread: FakeThread): OrchestrationV2ThreadShell {
   const modelSelection = thread.modelSelection ?? MODEL;
   return {
     id: thread.id,
-    projectId: PROJECT_ID,
+    projectId: thread.projectId ?? PROJECT_ID,
     title: thread.title,
     providerInstanceId: modelSelection.instanceId,
     modelSelection,
@@ -328,6 +331,7 @@ function shellOf(thread: FakeThread): OrchestrationV2ThreadShell {
     worktreePath: null,
     activeProviderThreadId: thread.providerThreads?.[0]?.id ?? null,
     ...(thread.issues === undefined ? {} : { issues: thread.issues }),
+    ...(thread.pullRequests === undefined ? {} : { pullRequests: thread.pullRequests }),
     lineage: {
       rootThreadId: parentOf(thread) ?? thread.id,
       parentThreadId: parentOf(thread) ?? null,
@@ -338,6 +342,7 @@ function shellOf(thread: FakeThread): OrchestrationV2ThreadShell {
     createdBy: thread.providerSubagentOf ? "agent" : "user",
     creationSource: thread.providerSubagentOf ? "provider" : "web",
     latestRunId: latest?.id ?? null,
+    latestRunCompletedAt: latest?.completedAt ?? null,
     activeRunId: null,
     // Idle reads as waiting on the user, which shows a per-second duration in the sidebar.
     status: latest ? "completed" : "idle",
@@ -352,7 +357,7 @@ function shellOf(thread: FakeThread): OrchestrationV2ThreadShell {
     archivedAt: null,
     settledOverride: thread.olderSettled ? "settled" : null,
     settledAt: thread.olderSettled ? AT : null,
-    lastVisitedAt: AT,
+    lastVisitedAt: thread.lastVisitedAt === undefined ? AT : thread.lastVisitedAt,
     deletedAt: null,
   };
 }
@@ -379,6 +384,7 @@ function projectionOf(thread: FakeThread): OrchestrationV2ThreadProjection {
       interactionMode: shell.interactionMode,
       branch: shell.branch,
       worktreePath: shell.worktreePath,
+      ...(shell.pullRequests === undefined ? {} : { pullRequests: shell.pullRequests }),
       activeProviderThreadId: shell.activeProviderThreadId,
       lineage: shell.lineage,
       forkedFrom: null,
@@ -389,7 +395,7 @@ function projectionOf(thread: FakeThread): OrchestrationV2ThreadProjection {
       archivedAt: null,
       settledOverride: shell.settledOverride,
       settledAt: shell.settledAt,
-      lastVisitedAt: AT,
+      lastVisitedAt: shell.lastVisitedAt ?? null,
       deletedAt: null,
     },
     runs: [...thread.runs],

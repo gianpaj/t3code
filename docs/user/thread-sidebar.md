@@ -61,7 +61,15 @@ in a new thread's model picker to add or remove them. A regular click returns to
 single model. Choose a base branch and send. Each selection starts a separate thread
 and worktree while you stay in the new thread composer. This requires a Git project.
 
-## Priority inbox
+## Filter the sidebar
+
+On web and desktop, pick projects with the three shortcuts or search for more in the
+project picker. Both controls update the same selection. Choose **All projects** in
+the picker to clear it.
+
+Click **All** to cycle through **Unread**, **Read**, and **All**. Read status follows
+whether you have seen the latest completion. Unread and Read show matching active
+and pinned threads. All also shows the Working, Snoozed, and Settled sections.
 
 **Priority** contains active threads with an approval, a question, or a known open
 pull request. Draft pull requests qualify. **Show more** reveals the matching threads

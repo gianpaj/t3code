@@ -1,3 +1,4 @@
+import { useHasOpenBranchPullRequest } from "../../state/use-thread-pr";
 import { useGT, useMessages } from "gt-react-native";
 import { useActiveNewTask } from "../../state/active-new-task";
 import { ThreadUndoNotice } from "../home/ThreadUndoNotice";
@@ -58,12 +59,14 @@ import {
 import { SwipeableScrollGateProvider, useSwipeableScrollGate } from "../home/thread-swipe-actions";
 import { usePendingTaskListActions } from "../home/usePendingTaskListActions";
 import { useThreadListActions } from "../home/useThreadListActions";
+import { ThreadListFilters } from "../home/ThreadListFilters";
 import { useFabScroll } from "../home/FabScrollContext";
 import { WorkspaceListHeader } from "../layout/workspace/WorkspaceListHeader";
 import { WorkspaceSidebarColumn } from "../layout/workspace/WorkspaceSidebarColumn";
 import {
   ThreadListV2PendingRow,
   ThreadListV2Row,
+  ThreadListV2ShelfHeader,
   ThreadListV2SettledShelfHeader,
   ThreadListV2ShowMoreRow,
   ThreadListV2SnoozedShelfHeader,
@@ -162,7 +165,7 @@ function ThreadNavigationSidebarPane(props: ThreadNavigationSidebarProps) {
   const availableEnvironmentIds = new Set(
     environments.map((environment) => environment.environmentId),
   );
-  const { options, setSelectedEnvironmentId, setSelectedProjectKey } =
+  const { options, setSelectedEnvironmentId, setSelectedProjectKey, cycleReadFilter } =
     useHomeListOptions(availableEnvironmentIds);
   const searchEnvironmentIds =
     options.selectedEnvironmentId === null
@@ -251,11 +254,16 @@ function ThreadNavigationSidebarPane(props: ThreadNavigationSidebarProps) {
     snoozedShelfExpanded,
     workingShelfEnabled,
     workingShelfExpanded,
+    priorityInboxEnabled,
+    priorityExpanded,
+    otherExpanded,
+    toggleInboxSection,
     toggleSettledShelf,
     toggleSnoozedShelf,
     toggleWorkingShelf,
   } = useThreadListV2ShelfPreferences();
   const now = useThreadListNow(threads);
+  const hasOpenBranchPullRequest = useHasOpenBranchPullRequest(priorityInboxEnabled);
   const listEnvironments = useAtomValue(threadListEnvironmentsAtom);
   const {
     providersByEnvironmentId,
@@ -276,6 +284,7 @@ function ThreadNavigationSidebarPane(props: ThreadNavigationSidebarProps) {
     items: threadListV2Items,
     contentOnlyThreadKeys,
     olderSettledShelf,
+    showMorePriority,
   } = useThreadListV2({
     threads: launchingThreads,
     pendingTasks,
@@ -294,6 +303,11 @@ function ThreadNavigationSidebarPane(props: ThreadNavigationSidebarProps) {
     shelfPreferencesLoaded,
     workingShelfEnabled,
     workingShelfExpanded,
+    priorityInboxEnabled,
+    hasOpenBranchPullRequest,
+    priorityExpanded,
+    otherExpanded,
+    readFilter: options.readFilter,
     snoozedShelfExpanded,
     settledShelfExpanded,
     selectedThreadKey,
@@ -490,6 +504,26 @@ function ThreadNavigationSidebarPane(props: ThreadNavigationSidebarProps) {
           />
         );
       }
+      case "v2-inbox-section":
+        return (
+          <ThreadListV2ShelfHeader
+            kind={item.kind}
+            count={item.count}
+            disabled={item.disabled}
+            expanded={item.expanded}
+            onToggle={() => toggleInboxSection(item.kind)}
+            pane="sidebar"
+          />
+        );
+      case "v2-priority-more":
+        return (
+          <ThreadListV2ShowMoreRow
+            pane="sidebar"
+            priority
+            hiddenCount={item.hiddenCount}
+            onPress={showMorePriority}
+          />
+        );
       case "v2-working-shelf":
         return (
           <ThreadListV2WorkingShelfHeader
@@ -534,6 +568,19 @@ function ThreadNavigationSidebarPane(props: ThreadNavigationSidebarProps) {
         );
     }
   };
+  const inboxFilters = priorityInboxEnabled ? (
+    <ThreadListFilters
+      gutter={Platform.OS === "ios" ? 8 : 0}
+      environments={environments}
+      projects={projectFilterOptions}
+      selectedEnvironmentId={options.selectedEnvironmentId}
+      selectedProjectKey={selectedProjectKey}
+      onEnvironmentChange={setSelectedEnvironmentId}
+      onProjectChange={setSelectedProjectKey}
+      readFilter={options.readFilter}
+      onCycleReadFilter={cycleReadFilter}
+    />
+  ) : null;
   const header = (
     <WorkspaceListHeader
       accessibilityLabel={gt("{appName}, Threads", { appName: "T3 Code" })}
@@ -643,6 +690,7 @@ function ThreadNavigationSidebarPane(props: ThreadNavigationSidebarProps) {
                 showsVerticalScrollIndicator={false}
                 style={styles.threadList}
                 ListEmptyComponent={listEmpty}
+                ListHeaderComponent={inboxFilters}
               />
             </GestureDetector>
           </SwipeableScrollGateProvider>
@@ -666,7 +714,7 @@ function ThreadNavigationSidebarPane(props: ThreadNavigationSidebarProps) {
           overflow: "hidden",
         }}
       >
-        {listItems.length === 0 ? (
+        {listItems.length === 0 && !priorityInboxEnabled ? (
           <View className="flex-1 items-center justify-center">{listEmpty}</View>
         ) : (
           <SwipeableScrollGateProvider enabled={swipeEnabled}>
@@ -696,6 +744,7 @@ function ThreadNavigationSidebarPane(props: ThreadNavigationSidebarProps) {
                 showsVerticalScrollIndicator={false}
                 style={styles.threadList}
                 ListEmptyComponent={listEmpty}
+                ListHeaderComponent={inboxFilters}
               />
             </GestureDetector>
           </SwipeableScrollGateProvider>

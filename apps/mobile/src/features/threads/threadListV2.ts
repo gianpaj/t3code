@@ -22,9 +22,14 @@ import {
 import { foldSearchQuery, rankSearchItems, scoreThreadSearch } from "@t3tools/shared/paletteSearch";
 import {
   createInboxReturnTracker,
+  groupPriorityInbox,
+  hasUnseenCompletion,
   isThreadWorking,
+  matchesThreadReadFilter,
+  PRIORITY_INBOX_LIMIT,
   sortInboxThreadsByReturn,
   sortWorkingThreadsBySend,
+  type ThreadReadFilter,
 } from "@t3tools/client-runtime/state/thread-inbox";
 import {
   sortActiveThreadsByOrderKey,
@@ -245,16 +250,7 @@ export const THREAD_LIST_V2_SETTLED_PAGE_COUNT = 25;
 export function threadHasUnseenCompletion(
   thread: Pick<EnvironmentThreadShell, "latestRun" | "lastVisitedAt">,
 ): boolean {
-  const completedAt = thread.latestRun?.completedAt;
-  if (!completedAt) return false;
-  const status = thread.latestRun?.status;
-  if (status === "interrupted" || status === "cancelled") return false;
-  const completedAtMs = Date.parse(completedAt);
-  if (Number.isNaN(completedAtMs)) return false;
-  if (!thread.lastVisitedAt) return false;
-  const lastVisitedAtMs = Date.parse(thread.lastVisitedAt);
-  if (Number.isNaN(lastVisitedAtMs)) return true;
-  return completedAtMs > lastVisitedAtMs;
+  return hasUnseenCompletion(thread);
 }
 
 export function resolveThreadListV2WokeAt(
@@ -419,6 +415,7 @@ export interface ThreadListV2Item {
 
 export interface ThreadListV2Layout {
   readonly items: ThreadListV2Item[];
+  readonly inboxSections: readonly ThreadListV2InboxSection[];
   readonly hiddenSettledCount: number;
   /** The settled rows the shelf may list, before its visible limit. */
   readonly listedSettledThreads: ReadonlyArray<EnvironmentThreadShell>;
@@ -432,6 +429,14 @@ export interface ThreadListV2Layout {
   readonly nextSnoozeWakeAt: string | null;
   /** Threads listed only because their messages match the search. */
   readonly contentOnlyThreadKeys: ReadonlySet<string>;
+}
+
+interface ThreadListV2InboxSection {
+  readonly kind: "priority" | "other";
+  readonly start: number;
+  readonly count: number;
+  readonly visibleCount: number;
+  readonly expanded: boolean;
 }
 
 export interface ThreadListV2ThreadListItem {
@@ -486,7 +491,20 @@ export type ThreadListV2ListItem =
   | ThreadListV2PendingListItem
   | ThreadListV2WorkingShelfListItem
   | ThreadListV2SnoozedShelfListItem
-  | ThreadListV2SettledShelfListItem;
+  | ThreadListV2SettledShelfListItem
+  | {
+      readonly type: "v2-inbox-section";
+      readonly key: string;
+      readonly kind: ThreadListV2InboxSection["kind"];
+      readonly count: number;
+      readonly expanded: boolean;
+      readonly disabled: boolean;
+    }
+  | {
+      readonly type: "v2-priority-more";
+      readonly key: "v2-priority-more";
+      readonly hiddenCount: number;
+    };
 
 export function isThreadListV2ListItem(value: {
   readonly type: string;
@@ -496,7 +514,9 @@ export function isThreadListV2ListItem(value: {
     value.type === "v2-pending" ||
     value.type === "v2-working-shelf" ||
     value.type === "v2-snoozed-shelf" ||
-    value.type === "v2-settled-shelf"
+    value.type === "v2-settled-shelf" ||
+    value.type === "v2-inbox-section" ||
+    value.type === "v2-priority-more"
   );
 }
 
@@ -552,6 +572,16 @@ export function threadListV2ListItemsAreEqual(
         previous.expanded === item.expanded &&
         previous.disabled === item.disabled
       );
+    case "v2-inbox-section":
+      return (
+        previous.type === "v2-inbox-section" &&
+        previous.kind === item.kind &&
+        previous.count === item.count &&
+        previous.expanded === item.expanded &&
+        previous.disabled === item.disabled
+      );
+    case "v2-priority-more":
+      return previous.type === "v2-priority-more" && previous.hiddenCount === item.hiddenCount;
   }
 }
 
@@ -580,6 +610,7 @@ function resolveThreadListV2ItemTimeLabel(
 
 export function buildThreadListV2ListItems(input: {
   readonly items: ReadonlyArray<ThreadListV2Item>;
+  readonly inboxSections?: readonly ThreadListV2InboxSection[];
   readonly pendingTasks: ReadonlyArray<PendingNewTask>;
   readonly workingCount?: number;
   readonly workingShelfExpanded?: boolean;
@@ -646,8 +677,29 @@ export function buildThreadListV2ListItems(input: {
   const snoozedEnd = settledShelfHeaderIndex ?? threadItems.length;
   const workingEnd = snoozedShelfHeaderIndex ?? snoozedEnd;
   const activeEnd = workingShelfHeaderIndex ?? workingEnd;
-  const result: ThreadListV2ListItem[] = [...pendingItems, ...threadItems.slice(0, activeEnd)];
+  const result: ThreadListV2ListItem[] = [...pendingItems];
   const shelfDisabled = input.shelfPreferencesLoading === true;
+  let cursor = 0;
+  for (const section of input.inboxSections ?? []) {
+    result.push(...threadItems.slice(cursor, section.start), {
+      type: "v2-inbox-section",
+      key: `v2-inbox-${section.kind}`,
+      kind: section.kind,
+      count: section.count,
+      expanded: section.expanded,
+      disabled: shelfDisabled,
+    });
+    cursor = section.start + section.visibleCount;
+    result.push(...threadItems.slice(section.start, cursor));
+    if (section.kind === "priority" && section.expanded && section.visibleCount < section.count) {
+      result.push({
+        type: "v2-priority-more",
+        key: "v2-priority-more",
+        hiddenCount: section.count - section.visibleCount,
+      });
+    }
+  }
+  result.push(...threadItems.slice(cursor, activeEnd));
   if (workingShelfHeaderIndex !== null && workingCount > 0) {
     result.push({
       type: "v2-working-shelf",
@@ -726,6 +778,13 @@ export function buildThreadListV2Items(input: {
   readonly settledLimit?: number;
   readonly now: string;
   readonly workingShelfEnabled?: boolean;
+  readonly priorityInbox?: {
+    readonly priorityExpanded: boolean;
+    readonly otherExpanded: boolean;
+    readonly showAllPriority: boolean;
+    readonly hasOpenBranchPullRequest?: ((thread: EnvironmentThreadShell) => boolean) | undefined;
+  };
+  readonly readFilter?: ThreadReadFilter;
   readonly workingShelfExpanded?: boolean;
   readonly isWorking?: (thread: EnvironmentThreadShell) => boolean;
   readonly inboxReturnAt?: (thread: EnvironmentThreadShell) => number | undefined;
@@ -757,6 +816,7 @@ export function buildThreadListV2Items(input: {
     : null;
 
   const workingShelfEnabled = input.workingShelfEnabled === true;
+  const readFilter = input.readFilter ?? "all";
   const pinned: EnvironmentThreadShell[] = [];
   const active: EnvironmentThreadShell[] = [];
   const working: EnvironmentThreadShell[] = [];
@@ -769,7 +829,8 @@ export function buildThreadListV2Items(input: {
       thread.archivedAt === null &&
       isListedThreadLineage(thread.lineage) &&
       (input.environmentId === null || thread.environmentId === input.environmentId) &&
-      (projectKeys === null || projectKeys.has(`${thread.environmentId}:${thread.projectId}`)),
+      (projectKeys === null || projectKeys.has(`${thread.environmentId}:${thread.projectId}`)) &&
+      (readFilter === "all" || matchesThreadReadFilter(thread, readFilter, undefined)),
   );
   // The same matches as the command palette, typo fallback included. Only
   // listed threads are ranked: a hidden exact match must not turn typos off.
@@ -798,6 +859,7 @@ export function buildThreadListV2Items(input: {
     const supportsSettlement = input.settlementEnvironmentIds?.has(thread.environmentId) ?? true;
     const supportsSnooze = input.snoozeEnvironmentIds?.has(thread.environmentId) ?? true;
     if (supportsSnooze && effectiveSnoozed(thread, { now })) {
+      if (readFilter !== "all") continue;
       snoozed.push(thread);
       if (
         thread.snoozedUntil != null &&
@@ -811,11 +873,11 @@ export function buildThreadListV2Items(input: {
     const hasQueuedMessages =
       queuedThreadKeys?.has(`${thread.environmentId}:${thread.id}`) === true;
     if (supportsSettlement && thread.settledOverride === "settled" && !hasQueuedMessages) {
-      settled.push(thread);
+      if (readFilter === "all") settled.push(thread);
     } else if (thread.pinnedAt != null) {
       pinned.push(thread);
     } else if (workingShelfEnabled && (input.isWorking ?? isThreadWorking)(thread)) {
-      working.push(thread);
+      if (readFilter === "all") working.push(thread);
     } else {
       active.push(thread);
     }
@@ -838,7 +900,9 @@ export function buildThreadListV2Items(input: {
       const thread = contentOnlyThreadKeys.has(key) ? threadByKey.get(key) : undefined;
       return thread ? [thread] : [];
     });
-    const results = [...rankedMatches, ...contentOnly];
+    const matches = [...rankedMatches, ...contentOnly];
+    const eligible = readFilter === "all" ? null : new Set([...active, ...pinned]);
+    const results = eligible === null ? matches : matches.filter((thread) => eligible.has(thread));
     return {
       items: results.map((thread, index) => ({
         thread,
@@ -848,6 +912,7 @@ export function buildThreadListV2Items(input: {
         wokeAt: slim.has(thread) ? null : resolveThreadListV2WokeAt(thread, { now }),
         isLast: index === results.length - 1,
       })),
+      inboxSections: [],
       hiddenSettledCount: 0,
       listedSettledThreads: [],
       workingCount: 0,
@@ -887,7 +952,8 @@ export function buildThreadListV2Items(input: {
     input.isListedSettled === undefined
       ? orderedSettled
       : orderedSettled.filter(input.isListedSettled);
-  const settledTotal = orderedSettled.length + (input.unloadedSettledCount ?? 0);
+  const settledTotal =
+    orderedSettled.length + (readFilter === "all" ? (input.unloadedSettledCount ?? 0) : 0);
   const settledLimit = input.settledLimit ?? Number.POSITIVE_INFINITY;
   const limitedSettled =
     listedSettled.length > settledLimit ? listedSettled.slice(0, settledLimit) : listedSettled;
@@ -908,6 +974,7 @@ export function buildThreadListV2Items(input: {
         );
 
   const items: ThreadListV2Item[] = [];
+  const inboxSections: ThreadListV2InboxSection[] = [];
   for (const thread of applyPendingThreadOrder(
     sortPinnedThreadsByOrderKey(pinned),
     "pinned",
@@ -922,15 +989,52 @@ export function buildThreadListV2Items(input: {
       isLast: false,
     });
   }
-  for (const thread of orderedActive) {
-    items.push({
-      thread,
-      variant: "card",
-      snoozed: false,
-      pinned: false,
-      wokeAt: resolveThreadListV2WokeAt(thread, { now }),
-      isLast: false,
-    });
+  const appendActive = (threads: readonly EnvironmentThreadShell[]) => {
+    for (const thread of threads) {
+      items.push({
+        thread,
+        variant: "card",
+        snoozed: false,
+        pinned: false,
+        wokeAt: resolveThreadListV2WokeAt(thread, { now }),
+        isLast: false,
+      });
+    }
+  };
+  const inbox = input.priorityInbox;
+  if (inbox === undefined) {
+    appendActive(orderedActive);
+  } else {
+    const { priority, other } = groupPriorityInbox(
+      orderedActive,
+      inbox.hasOpenBranchPullRequest ?? (() => false),
+    );
+    const appendSection = (
+      kind: ThreadListV2InboxSection["kind"],
+      threads: readonly EnvironmentThreadShell[],
+      expanded: boolean,
+      limit: number,
+    ) => {
+      if (threads.length === 0) return;
+      const visible = expanded
+        ? threads.slice(0, limit)
+        : threads.filter((thread) => `${thread.environmentId}:${thread.id}` === selectedThreadKey);
+      inboxSections.push({
+        kind,
+        start: items.length,
+        count: threads.length,
+        visibleCount: visible.length,
+        expanded,
+      });
+      appendActive(visible);
+    };
+    appendSection(
+      "priority",
+      priority,
+      inbox.priorityExpanded,
+      inbox.showAllPriority ? Infinity : PRIORITY_INBOX_LIMIT,
+    );
+    appendSection("other", other, inbox.otherExpanded, Infinity);
   }
   const workingShelfHeaderIndex = orderedWorking.length > 0 ? items.length : null;
   for (const thread of visibleWorking) {
@@ -971,6 +1075,7 @@ export function buildThreadListV2Items(input: {
   }
   return {
     items,
+    inboxSections,
     hiddenSettledCount: Math.max(0, settledTotal - pagedSettled.length),
     listedSettledThreads: listedSettled,
     workingCount: orderedWorking.length,

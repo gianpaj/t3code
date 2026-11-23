@@ -169,6 +169,9 @@ export interface Preferences {
   readonly projectGroupingMode?: SidebarProjectGroupingMode;
   readonly toolCallVisibility?: ToolCallVisibility;
   readonly workingShelfEnabled?: boolean;
+  readonly priorityInboxEnabled?: boolean;
+  readonly threadListPriorityExpanded?: boolean;
+  readonly threadListOtherExpanded?: boolean;
   readonly useLastProjectForNewThreads?: boolean;
   readonly lastThreadProject?: typeof ThreadProject.Type;
   readonly modelFavorites?: ReadonlyArray<{
@@ -259,6 +262,9 @@ function sanitizePreferences(parsed: Preferences): Preferences {
     projectGroupingMode?: SidebarProjectGroupingMode;
     toolCallVisibility?: ToolCallVisibility;
     workingShelfEnabled?: boolean;
+    priorityInboxEnabled?: boolean;
+    threadListPriorityExpanded?: boolean;
+    threadListOtherExpanded?: boolean;
     useLastProjectForNewThreads?: boolean;
     lastThreadProject?: typeof ThreadProject.Type;
     modelFavorites?: Preferences["modelFavorites"];
@@ -393,6 +399,15 @@ function sanitizePreferences(parsed: Preferences): Preferences {
   }
   if (typeof parsed.workingShelfEnabled === "boolean") {
     preferences.workingShelfEnabled = parsed.workingShelfEnabled;
+  }
+  if (typeof parsed.priorityInboxEnabled === "boolean") {
+    preferences.priorityInboxEnabled = parsed.priorityInboxEnabled;
+  }
+  if (typeof parsed.threadListPriorityExpanded === "boolean") {
+    preferences.threadListPriorityExpanded = parsed.threadListPriorityExpanded;
+  }
+  if (typeof parsed.threadListOtherExpanded === "boolean") {
+    preferences.threadListOtherExpanded = parsed.threadListOtherExpanded;
   }
   if (typeof parsed.useLastProjectForNewThreads === "boolean") {
     preferences.useLastProjectForNewThreads = parsed.useLastProjectForNewThreads;

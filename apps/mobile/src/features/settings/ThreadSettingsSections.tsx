@@ -35,6 +35,9 @@ import {
 export function SettingsLabsRouteScreen() {
   const gt = useGT();
   const insets = useSafeAreaInsets();
+  const preferences = useAtomValue(mobilePreferencesAtom);
+  const savePreferences = useAtomCommand(saveMobilePreferences);
+  const ready = AsyncResult.isSuccess(preferences);
 
   return (
     <SettingsScreen title={gt("Labs")}>
@@ -45,6 +48,17 @@ export function SettingsLabsRouteScreen() {
         contentContainerClassName="gap-6 px-5 pt-4"
         contentContainerStyle={{ paddingBottom: Math.max(insets.bottom, 18) + 18 }}
       >
+        <SettingsSection title={gt("Beta")}>
+          <SettingsSwitchRow
+            icon="line.3.horizontal.decrease"
+            label={gt("Priority inbox")}
+            value={ready && preferences.value.priorityInboxEnabled === true}
+            disabled={!ready}
+            onValueChange={(priorityInboxEnabled) => {
+              void savePreferences({ priorityInboxEnabled });
+            }}
+          />
+        </SettingsSection>
         <MachineBetaSection
           title={gt("Linked environments")}
           icon="link"

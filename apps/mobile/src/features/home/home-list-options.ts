@@ -1,5 +1,9 @@
 import type { EnvironmentId, SidebarProjectGroupingMode } from "@t3tools/contracts";
 import { DEFAULT_SIDEBAR_PROJECT_SORT_ORDER } from "@t3tools/contracts";
+import {
+  nextThreadReadFilter,
+  type ThreadReadFilter,
+} from "@t3tools/client-runtime/state/thread-inbox";
 import { RegistryContext, useAtomValue } from "@effect/atom-react";
 import { Atom } from "effect/reactivity";
 import { createContext, createElement, useContext, useState, type PropsWithChildren } from "react";
@@ -13,6 +17,7 @@ export interface HomeListOptions {
   readonly selectedEnvironmentId: EnvironmentId | null;
   readonly selectedProjectKey: string | null;
   readonly projectSortOrder: HomeProjectSortOrder;
+  readonly readFilter: ThreadReadFilter;
 }
 
 export interface ResolvedHomeListOptions extends HomeListOptions {
@@ -23,6 +28,7 @@ function defaultHomeListOptions(filters?: ThreadListFilters): HomeListOptions {
   return {
     selectedEnvironmentId: filters?.environmentId ?? null,
     selectedProjectKey: filters?.projectKey ?? null,
+    readFilter: "all",
     projectSortOrder:
       DEFAULT_SIDEBAR_PROJECT_SORT_ORDER === "manual"
         ? "updated_at"
@@ -107,5 +113,6 @@ export function useHomeListOptions(availableEnvironmentIds: ReadonlySet<Environm
     setSelectedEnvironmentId,
     setSelectedProjectKey,
     setProjectSortOrder,
+    cycleReadFilter: () => updateOptions({ readFilter: nextThreadReadFilter[options.readFilter] }),
   } as const;
 }

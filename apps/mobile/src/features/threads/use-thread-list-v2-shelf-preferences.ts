@@ -15,6 +15,14 @@ export function useThreadListV2ShelfPreferences() {
   const workingShelfEnabled = loaded && preferencesResult.value.workingShelfEnabled !== false;
   const workingShelfExpanded =
     loaded && preferencesResult.value.threadListWorkingShelfExpanded === true;
+  const priorityInboxEnabled = loaded && preferencesResult.value.priorityInboxEnabled === true;
+  const priorityExpanded = !loaded || preferencesResult.value.threadListPriorityExpanded !== false;
+  const otherExpanded = !loaded || preferencesResult.value.threadListOtherExpanded !== false;
+  const toggleInboxSection = (kind: "priority" | "other") => {
+    if (!loaded) return;
+    const key = kind === "priority" ? "threadListPriorityExpanded" : "threadListOtherExpanded";
+    void savePreferences({ transform: (current) => ({ [key]: current[key] === false }) });
+  };
 
   // Transforms read optimistic state so same-frame presses toggle twice.
   const toggleSnoozedShelf = () => {
@@ -48,6 +56,10 @@ export function useThreadListV2ShelfPreferences() {
     snoozedShelfExpanded,
     workingShelfEnabled,
     workingShelfExpanded,
+    priorityInboxEnabled,
+    priorityExpanded,
+    otherExpanded,
+    toggleInboxSection,
     toggleSettledShelf,
     toggleSnoozedShelf,
     toggleWorkingShelf,

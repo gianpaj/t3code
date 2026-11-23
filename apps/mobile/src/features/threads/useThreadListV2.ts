@@ -1,6 +1,6 @@
 import type { OlderSettledScope } from "@t3tools/client-runtime/state/threads";
 import type { EnvironmentId } from "@t3tools/contracts";
-import { useMemo, useSyncExternalStore } from "react";
+import { useMemo, useState, useSyncExternalStore } from "react";
 
 import { keepMarked } from "../../i18n/messages";
 import { scopedProjectKey } from "../../lib/scopedEntities";
@@ -63,11 +63,27 @@ export function useThreadListV2(input: {
   readonly shelfPreferencesLoaded: boolean;
   readonly workingShelfEnabled: boolean;
   readonly workingShelfExpanded: boolean;
+  readonly priorityInboxEnabled?: boolean;
+  readonly priorityExpanded?: boolean;
+  readonly otherExpanded?: boolean;
+  readonly readFilter?: LayoutInput["readFilter"];
+  readonly hasOpenBranchPullRequest?: NonNullable<
+    LayoutInput["priorityInbox"]
+  >["hasOpenBranchPullRequest"];
   readonly snoozedShelfExpanded: boolean;
   readonly settledShelfExpanded: boolean;
   readonly selectedThreadKey: string | null;
 }) {
   const { threads, workingShelfEnabled } = input;
+  const priorityScope = JSON.stringify([input.environmentId, input.projectRefs, input.readFilter]);
+  const [priorityTail, setPriorityTail] = useState({ scope: priorityScope, expanded: false });
+  if (priorityTail.scope !== priorityScope) {
+    setPriorityTail({ scope: priorityScope, expanded: false });
+  }
+  const showAllPriority = priorityTail.scope === priorityScope && priorityTail.expanded;
+  const showMorePriority = () => setPriorityTail({ scope: priorityScope, expanded: true });
+  const readFilter = input.priorityInboxEnabled ? (input.readFilter ?? "all") : "all";
+  const showShelves = readFilter === "all";
   const layoutTime = useMemo(
     () => threadListV2LayoutTime({ threads, now: input.now, searchQuery: input.searchQuery }),
     [threads, input.now, input.searchQuery],
@@ -118,16 +134,18 @@ export function useThreadListV2(input: {
   // Older settled threads load in pages; the shelf lists them only as far as they are loaded.
   const scopes = useMemo(
     () =>
-      olderSettledScopes({
-        environmentId: input.environmentId,
-        projectRefs: input.projectRefs,
-        settlementEnvironmentIds: input.settlementEnvironmentIds,
-      }),
-    [input.environmentId, input.projectRefs, input.settlementEnvironmentIds],
+      showShelves
+        ? olderSettledScopes({
+            environmentId: input.environmentId,
+            projectRefs: input.projectRefs,
+            settlementEnvironmentIds: input.settlementEnvironmentIds,
+          })
+        : [],
+    [input.environmentId, input.projectRefs, input.settlementEnvironmentIds, showShelves],
   );
   const olderSettledShelf = useOlderSettledShelf({
     scopes,
-    expanded: input.settledShelfExpanded,
+    expanded: showShelves && input.settledShelfExpanded,
     // A search lists only matches, so the shelf would page forever; loaded pages stay.
     visibleCount: input.searchQuery.trim().length === 0 ? input.settledLimit : 0,
   });
@@ -147,6 +165,17 @@ export function useThreadListV2(input: {
         settledLimit: input.settledLimit,
         now: layoutTime,
         workingShelfEnabled,
+        readFilter,
+        ...(input.priorityInboxEnabled
+          ? {
+              priorityInbox: {
+                priorityExpanded: input.priorityExpanded !== false,
+                otherExpanded: input.otherExpanded !== false,
+                showAllPriority,
+                hasOpenBranchPullRequest: input.hasOpenBranchPullRequest,
+              },
+            }
+          : {}),
         workingShelfExpanded: input.workingShelfExpanded,
         inboxReturnAt: inbox.returnedAt,
         isWorking: inbox.isWorking,
@@ -179,6 +208,12 @@ export function useThreadListV2(input: {
       input.settledLimit,
       layoutTime,
       workingShelfEnabled,
+      readFilter,
+      input.priorityInboxEnabled,
+      input.priorityExpanded,
+      input.otherExpanded,
+      showAllPriority,
+      input.hasOpenBranchPullRequest,
       input.workingShelfExpanded,
       inbox.returnedAt,
       inbox.isWorking,
@@ -214,6 +249,7 @@ export function useThreadListV2(input: {
     () =>
       buildThreadListV2ListItems({
         items: layout.items,
+        inboxSections: layout.inboxSections,
         pendingTasks,
         workingCount: layout.workingCount,
         workingShelfExpanded: input.workingShelfExpanded,
@@ -244,7 +280,7 @@ export function useThreadListV2(input: {
       input.shelfPreferencesLoaded,
     ],
   );
-  return { layout, items, contentOnlyThreadKeys, olderSettledShelf };
+  return { layout, items, contentOnlyThreadKeys, olderSettledShelf, showMorePriority };
 }
 
 /** The list's scope per environment: its projects there, or every project. */

@@ -1,5 +1,10 @@
 import { useGT } from "gt-react-native";
 import { Pressable, ScrollView } from "react-native";
+import {
+  nextThreadReadFilter,
+  type ThreadReadFilter,
+} from "@t3tools/client-runtime/state/thread-inbox";
+import { Chip } from "../../components/ui/Chip";
 import { SymbolView } from "../../components/ui/AppSymbol";
 import { ListFilterMenu } from "../layout/workspace/ListFilterMenu";
 import type { EnvironmentId } from "@t3tools/contracts";
@@ -15,6 +20,8 @@ export function ThreadListFilters(props: {
   readonly selectedProjectKey: string | null;
   readonly onEnvironmentChange: (environmentId: EnvironmentId | null) => void;
   readonly onProjectChange: (projectKey: string | null) => void;
+  readonly readFilter?: ThreadReadFilter | undefined;
+  readonly onCycleReadFilter?: (() => void) | undefined;
   /** List padding the scroller bleeds through so pills start where row content does. */
   readonly gutter: number;
 }) {
@@ -25,6 +32,11 @@ export function ThreadListFilters(props: {
   const selectedProject = props.projects.find(
     (project) => project.key === props.selectedProjectKey,
   );
+  const readLabels = {
+    all: gt("All", { $context: "thread read filter" }),
+    unread: gt("Unread", { $context: "thread read filter" }),
+    read: gt("Read", { $context: "thread read filter" }),
+  };
   return (
     <ScrollView
       horizontal
@@ -32,6 +44,18 @@ export function ThreadListFilters(props: {
       style={{ marginHorizontal: -props.gutter, overflow: "visible" }}
       contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 2, paddingBottom: 10, gap: 8 }}
     >
+      {props.readFilter !== undefined ? (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={gt("Read filter: {current}. Switch to {next}.", {
+            current: readLabels[props.readFilter],
+            next: readLabels[nextThreadReadFilter[props.readFilter]],
+          })}
+          onPress={props.onCycleReadFilter}
+        >
+          <Chip label={readLabels[props.readFilter]} selected={props.readFilter !== "all"} />
+        </Pressable>
+      ) : null}
       <ListFilterMenu
         label={selectedEnvironment?.label ?? gt("All environments")}
         accessibilityLabel={gt("Filter threads by environment")}

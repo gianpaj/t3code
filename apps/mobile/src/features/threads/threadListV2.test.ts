@@ -1864,6 +1864,78 @@ describe("Working section beta", () => {
   });
 });
 
+describe("Priority inbox", () => {
+  it("caps filtered Priority results and keeps both headings when collapsed", () => {
+    const projectId = ProjectId.make("priority-project");
+    const completed = {
+      runId: RunId.make("completed"),
+      status: "completed",
+      requestedAt: "2026-06-01T00:00:00.000Z",
+      startedAt: "2026-06-01T00:00:00.000Z",
+      completedAt: "2026-06-01T01:00:00.000Z",
+      assistantMessageId: null,
+    } as const;
+    const unread = {
+      projectId,
+      latestRun: completed,
+      lastVisitedAt: "2026-06-01T00:00:00.000Z",
+    };
+    const threads = [
+      ...Array.from({ length: 6 }, (_, index) =>
+        makeThread({
+          ...unread,
+          id: ThreadId.make(`open-${index}`),
+          title: `Open PR ${index}`,
+        }),
+      ),
+      makeThread({ ...unread, id: ThreadId.make("other"), title: "Other" }),
+      makeThread({
+        ...unread,
+        id: ThreadId.make("open-read"),
+        title: "Read",
+        lastVisitedAt: NOW,
+      }),
+      makeThread({
+        ...unread,
+        projectId: ProjectId.make("another-project"),
+        id: ThreadId.make("open-elsewhere"),
+        title: "Another project",
+      }),
+    ];
+    const build = (expanded: boolean, showAllPriority = false) => {
+      const layout = buildThreadListV2Items({
+        threads,
+        environmentId: null,
+        projectRefs: [{ environmentId, projectId }],
+        searchQuery: "",
+        now: NOW,
+        readFilter: "unread",
+        priorityInbox: {
+          priorityExpanded: expanded,
+          otherExpanded: expanded,
+          showAllPriority,
+          hasOpenBranchPullRequest: (thread) => thread.id.startsWith("open-"),
+        },
+      });
+      return buildThreadListV2ListItems({
+        items: layout.items,
+        inboxSections: layout.inboxSections,
+        pendingTasks: [],
+      });
+    };
+    const expanded = build(true);
+    expect(expanded[0]).toMatchObject({ kind: "priority", count: 6, expanded: true });
+    expect(expanded.slice(1, 6).every((item) => item.type === "v2-thread")).toBe(true);
+    expect(expanded[6]).toMatchObject({ type: "v2-priority-more", hiddenCount: 1 });
+    expect(expanded[7]).toMatchObject({ kind: "other", count: 1, expanded: true });
+    expect(build(true, true).filter((item) => item.type === "v2-thread")).toHaveLength(7);
+    expect(build(false)).toMatchObject([
+      { kind: "priority", count: 6, expanded: false },
+      { kind: "other", count: 1, expanded: false },
+    ]);
+  });
+});
+
 describe("queued messages keep a settled thread active", () => {
   const threads = [
     makeThread({ id: ThreadId.make("active"), title: "Active" }),

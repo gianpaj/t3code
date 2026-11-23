@@ -5468,5 +5468,21 @@
   "ad208e3e32c85029": "Alle ausblenden",
   "3328503592789bed": "Zen",
   "856812e7e1fc445e": "Tool-Aufrufe im Chat",
-  "8d545d54c0a9e950": "Die Befehle, Bearbeitungen und Suchen ausblenden, die Agenten ausführen. „Erfolgreiche ausblenden“ behält Fehler. „Zen“ zeigt nur endgültige Antworten. Genehmigungen, Fragen und Fehler werden immer angezeigt."
+  "8d545d54c0a9e950": "Die Befehle, Bearbeitungen und Suchen ausblenden, die Agenten ausführen. „Erfolgreiche ausblenden“ behält Fehler. „Zen“ zeigt nur endgültige Antworten. Genehmigungen, Fragen und Fehler werden immer angezeigt.",
+  "b7fc5996163acaa9": "Alle",
+  "9477ee90563e4e75": "Ungelesen",
+  "b5c95528e51839b6": "Gelesen",
+  "420131b2d7cc0684": "Lesefilter: {current}. Zu {next} wechseln.",
+  "45fa271ea0e1ac8e": "Beta",
+  "62470f9a46ccc742": "Prioritäts-Posteingang",
+  "81ce599a9a27a87f": "Priorität",
+  "874902210174e1bf": "{count, plural, one {{count} priorisierter Thread} other {{count} priorisierte Threads}}",
+  "8bf406f08cbb5f04": "Priorisierte Threads einklappen.",
+  "5d9ad9467f542656": "Priorisierte Threads ausklappen.",
+  "0092b683965b3495": "Alles andere",
+  "15e055529b29111e": "{count, plural, one {{count} weiterer Thread} other {{count} weitere Threads}}",
+  "859bee4cbbe5c761": "Weitere Threads einklappen.",
+  "80ef4f98e0480aa8": "Weitere Threads ausklappen.",
+  "30dd0bc6543823e5": "Mehr anzeigen ({count})",
+  "a4075169c1ed6ad0": "{count, plural, one {{count} weiteren priorisierten Thread anzeigen} other {{count} weitere priorisierte Threads anzeigen}}"
 }

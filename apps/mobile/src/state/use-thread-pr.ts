@@ -8,7 +8,7 @@ import type { EnvironmentId, PullRequestSummary } from "@t3tools/contracts";
 import * as Effect from "effect/Effect";
 import { Atom } from "effect/reactivity";
 import { useMessages } from "gt-react-native";
-import { use, useMemo } from "react";
+import { use, useCallback, useMemo } from "react";
 
 import { connectionAtomRuntime } from "../connection/runtime";
 import { appAtomRegistry } from "./atom-registry";
@@ -43,6 +43,35 @@ function snapshotKey(
     reference.repository,
     reference.number,
   ]);
+}
+
+const openPullRequestKeysAtom = Atom.make((get) => {
+  const keys = new Set<string>();
+  for (const [key, summary] of get(pullRequestSnapshotsAtom)) {
+    if (summary.state === "open") keys.add(key);
+  }
+  return keys;
+}).pipe(
+  Atom.withEquality<Set<string>>(
+    (previous, next) => previous.size === next.size && [...previous].every((key) => next.has(key)),
+  ),
+);
+
+const noOpenPullRequestsAtom = Atom.make(new Set<string>());
+
+export function useHasOpenBranchPullRequest(enabled: boolean) {
+  const open = useAtomValue(enabled ? openPullRequestKeysAtom : noOpenPullRequestsAtom);
+  return useCallback(
+    (thread: EnvironmentThreadShell) => {
+      const reference = thread.branchPullRequest;
+      return (
+        reference != null &&
+        !thread.pullRequests.some((link) => link.source !== "stack-dismissed") &&
+        open.has(snapshotKey(thread.environmentId, reference))
+      );
+    },
+    [open],
+  );
 }
 
 const pullRequestSummaryAtom = createLinkedPullRequestSummaryAtomFamily(

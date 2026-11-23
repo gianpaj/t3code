@@ -5462,5 +5462,21 @@
   "ad208e3e32c85029": "Tout masquer",
   "3328503592789bed": "Zen",
   "856812e7e1fc445e": "Appels d’outils dans la discussion",
-  "8d545d54c0a9e950": "Masque les commandes, modifications et recherches lancées par les agents. Masquer les réussis garde les échecs. Zen n’affiche que les réponses finales. Les approbations, questions et erreurs s’affichent toujours."
+  "8d545d54c0a9e950": "Masque les commandes, modifications et recherches lancées par les agents. Masquer les réussis garde les échecs. Zen n’affiche que les réponses finales. Les approbations, questions et erreurs s’affichent toujours.",
+  "b7fc5996163acaa9": "Tout",
+  "9477ee90563e4e75": "Non lus",
+  "b5c95528e51839b6": "Lus",
+  "420131b2d7cc0684": "Filtre de lecture : {current}. Passer à {next}.",
+  "45fa271ea0e1ac8e": "Bêta",
+  "62470f9a46ccc742": "Boîte de réception prioritaire",
+  "81ce599a9a27a87f": "Priorité",
+  "874902210174e1bf": "{count, plural, one {{count} fil prioritaire} other {{count} fils prioritaires}}",
+  "8bf406f08cbb5f04": "Réduit les fils prioritaires.",
+  "5d9ad9467f542656": "Développe les fils prioritaires.",
+  "0092b683965b3495": "Tout le reste",
+  "15e055529b29111e": "{count, plural, one {{count} autre fil} other {{count} autres fils}}",
+  "859bee4cbbe5c761": "Réduit les autres fils.",
+  "80ef4f98e0480aa8": "Développe les autres fils.",
+  "30dd0bc6543823e5": "Afficher plus ({count})",
+  "a4075169c1ed6ad0": "{count, plural, one {Afficher {count} fil prioritaire de plus} other {Afficher {count} fils prioritaires de plus}}"
 }

@@ -325,6 +325,18 @@ type ThreadListV2ShelfHeaderProps = {
 };
 
 const SHELF_COPY = {
+  priority: {
+    label: msg("Priority", { $context: "thread list section" }),
+    count: msg("{count, plural, one {{count} priority thread} other {{count} priority threads}}"),
+    collapse: msg("Collapses the priority threads."),
+    expand: msg("Expands the priority threads."),
+  },
+  other: {
+    label: msg("Everything else", { $context: "thread list section" }),
+    count: msg("{count, plural, one {{count} other thread} other {{count} other threads}}"),
+    collapse: msg("Collapses the other threads."),
+    expand: msg("Expands the other threads."),
+  },
   working: {
     label: msg("Working", { $context: "thread list section" }),
     count: msg("{count, plural, one {{count} working thread} other {{count} working threads}}"),
@@ -345,7 +357,7 @@ const SHELF_COPY = {
   },
 } as const;
 
-function ThreadListV2ShelfHeader(
+export function ThreadListV2ShelfHeader(
   props: ThreadListV2ShelfHeaderProps & { readonly kind: keyof typeof SHELF_COPY },
 ) {
   const gt = useGT();
@@ -389,6 +401,7 @@ export const ThreadListV2SettledShelfHeader = memo(function ThreadListV2SettledS
 export const ThreadListV2ShowMoreRow = memo(function ThreadListV2ShowMoreRow(props: {
   readonly pane?: "screen" | "sidebar";
   readonly hiddenCount: number;
+  readonly priority?: boolean;
   /** Older settled threads are loading, or their last read failed. */
   readonly state?: "loading" | "failed";
   readonly onPress: () => void;
@@ -399,22 +412,31 @@ export const ThreadListV2ShowMoreRow = memo(function ThreadListV2ShowMoreRow(pro
       ? gt("Loading", { $context: "older threads are loading" })
       : props.state === "failed"
         ? gt("Could not load older threads. Retry")
-        : gt(
-            "{count, plural, one {Show more ({count} settled hidden)} other {Show more ({count} settled hidden)}}",
-            { count: props.hiddenCount },
-          );
+        : props.priority
+          ? gt("Show more ({count})", { count: props.hiddenCount })
+          : gt(
+              "{count, plural, one {Show more ({count} settled hidden)} other {Show more ({count} settled hidden)}}",
+              { count: props.hiddenCount },
+            );
   return (
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={
-        props.state === undefined
+        props.priority
           ? gt(
-              "{count, plural, one {Show {count} more settled threads} other {Show {count} more settled threads}}",
+              "{count, plural, one {Show {count} more priority thread} other {Show {count} more priority threads}}",
               {
-                count: Math.min(props.hiddenCount, THREAD_LIST_V2_SETTLED_PAGE_COUNT),
+                count: props.hiddenCount,
               },
             )
-          : label
+          : props.state === undefined
+            ? gt(
+                "{count, plural, one {Show {count} more settled threads} other {Show {count} more settled threads}}",
+                {
+                  count: Math.min(props.hiddenCount, THREAD_LIST_V2_SETTLED_PAGE_COUNT),
+                },
+              )
+            : label
       }
       disabled={props.state === "loading"}
       onPress={props.onPress}

@@ -1,3 +1,4 @@
+import { useHasOpenBranchPullRequest } from "../../state/use-thread-pr";
 import { useGT, useMessages } from "gt-react-native";
 
 import { useContentTopInset } from "../../components/ui/useBarInset";
@@ -75,6 +76,7 @@ import { useQueuedThreadKeys } from "../../state/use-thread-outbox";
 import {
   ThreadListV2PendingRow,
   ThreadListV2Row,
+  ThreadListV2ShelfHeader,
   ThreadListV2SettledShelfHeader,
   ThreadListV2ShowMoreRow,
   ThreadListV2SnoozedShelfHeader,
@@ -117,6 +119,8 @@ interface HomeScreenProps {
     HomeListFilterMenuEnvironment & Pick<WorkspaceEnvironment, "connectionState">
   >;
   readonly searchQuery: string;
+  readonly readFilter?: Parameters<typeof useThreadListV2>[0]["readFilter"];
+  readonly onCycleReadFilter?: () => void;
   readonly selectedEnvironmentId: EnvironmentId | null;
   readonly selectedProjectKey: string | null;
   readonly projectSortOrder: HomeProjectSortOrder;
@@ -393,11 +397,16 @@ export function HomeScreen(props: HomeScreenProps) {
     snoozedShelfExpanded,
     workingShelfEnabled,
     workingShelfExpanded,
+    priorityInboxEnabled,
+    priorityExpanded,
+    otherExpanded,
+    toggleInboxSection,
     toggleSettledShelf,
     toggleSnoozedShelf,
     toggleWorkingShelf,
   } = useThreadListV2ShelfPreferences();
   const now = useThreadListNow(props.threads);
+  const hasOpenBranchPullRequest = useHasOpenBranchPullRequest(priorityInboxEnabled);
   const listEnvironments = useAtomValue(threadListEnvironmentsAtom);
   const {
     providersByEnvironmentId,
@@ -418,6 +427,7 @@ export function HomeScreen(props: HomeScreenProps) {
     items: threadListV2Items,
     contentOnlyThreadKeys,
     olderSettledShelf,
+    showMorePriority,
   } = useThreadListV2({
     threads: props.threads,
     pendingTasks: props.pendingTasks,
@@ -436,6 +446,11 @@ export function HomeScreen(props: HomeScreenProps) {
     shelfPreferencesLoaded,
     workingShelfEnabled,
     workingShelfExpanded,
+    priorityInboxEnabled,
+    hasOpenBranchPullRequest,
+    priorityExpanded,
+    otherExpanded,
+    readFilter: props.readFilter,
     snoozedShelfExpanded,
     settledShelfExpanded,
     selectedThreadKey,
@@ -494,6 +509,26 @@ export function HomeScreen(props: HomeScreenProps) {
           onSwipeableWillOpen={handleSwipeableWillOpen}
           simultaneousSwipeGesture={homeScrollGesture}
           activationKey={item.key}
+        />
+      );
+    }
+    if (item.type === "v2-inbox-section") {
+      return (
+        <ThreadListV2ShelfHeader
+          kind={item.kind}
+          count={item.count}
+          disabled={item.disabled}
+          expanded={item.expanded}
+          onToggle={() => toggleInboxSection(item.kind)}
+        />
+      );
+    }
+    if (item.type === "v2-priority-more") {
+      return (
+        <ThreadListV2ShowMoreRow
+          priority
+          hiddenCount={item.hiddenCount}
+          onPress={showMorePriority}
         />
       );
     }
@@ -683,7 +718,7 @@ export function HomeScreen(props: HomeScreenProps) {
   const v2ListHeader = (
     <>
       {listHeader}
-      {Platform.OS === "ios" && workspace ? (
+      {priorityInboxEnabled || (Platform.OS === "ios" && workspace) ? (
         <ThreadListFilters
           gutter={sidebarSurface ? 8 : 0}
           environments={props.environments}
@@ -702,6 +737,8 @@ export function HomeScreen(props: HomeScreenProps) {
           selectedProjectKey={props.selectedProjectKey}
           onEnvironmentChange={props.onEnvironmentChange}
           onProjectChange={props.onProjectChange}
+          readFilter={priorityInboxEnabled ? (props.readFilter ?? "all") : undefined}
+          onCycleReadFilter={props.onCycleReadFilter}
         />
       ) : null}
     </>
@@ -748,7 +785,7 @@ export function HomeScreen(props: HomeScreenProps) {
       />
     );
 
-  if (Platform.OS === "android" && threadListV2Items.length === 0) {
+  if (Platform.OS === "android" && threadListV2Items.length === 0 && !priorityInboxEnabled) {
     return (
       <ScreenContent surface="screen">
         <View

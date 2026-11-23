@@ -5478,5 +5478,6 @@
   "859bee4cbbe5c761": "Recolhe as outras conversas.",
   "80ef4f98e0480aa8": "Expande as outras conversas.",
   "30dd0bc6543823e5": "Mostrar mais ({count})",
-  "a4075169c1ed6ad0": "{count, plural, one {Mostrar mais {count} conversa prioritária} other {Mostrar mais {count} conversas prioritárias}}"
+  "a4075169c1ed6ad0": "{count, plural, one {Mostrar mais {count} conversa prioritária} other {Mostrar mais {count} conversas prioritárias}}",
+  "d34dce937c4ba5b9": "Nenhum tópico correspondente."
 }

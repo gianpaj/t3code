@@ -99,6 +99,37 @@ export function resolveHomeProjectFilterScope(
   return pickableProjectGroups(scopes).find((scope) => scope.key === key) ?? null;
 }
 
+export function resolveHomeProjectSelection(
+  scopes: ReadonlyArray<HomeProjectScope>,
+  projects: ReadonlyArray<EnvironmentProject>,
+  options: {
+    readonly selectedProjectKeys: readonly string[];
+    readonly projectGroupingMode: SidebarProjectGroupingMode;
+  },
+) {
+  const keysByScope = new Map<string, string[]>();
+  const selectedScopes: HomeProjectScope[] = [];
+  for (const key of options.selectedProjectKeys) {
+    const scope = resolveHomeProjectFilterScope(scopes, projects, {
+      projectGroupingMode: options.projectGroupingMode,
+      selectedProjectKey: key,
+    });
+    if (!scope) continue;
+    const keys = keysByScope.get(scope.key);
+    if (keys) {
+      keys.push(key);
+    } else {
+      keysByScope.set(scope.key, [key]);
+      selectedScopes.push(scope);
+    }
+  }
+  return {
+    keysByScope,
+    selectedScopes,
+    selectedProjectKeys: [...keysByScope.keys()],
+  };
+}
+
 export function findHomeProjectScope(
   scopes: ReadonlyArray<HomeProjectScope>,
   key: string | null,

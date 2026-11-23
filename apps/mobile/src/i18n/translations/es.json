@@ -5478,5 +5478,6 @@
   "859bee4cbbe5c761": "Contrae los hilos restantes.",
   "80ef4f98e0480aa8": "Expande los hilos restantes.",
   "30dd0bc6543823e5": "Mostrar más ({count})",
-  "a4075169c1ed6ad0": "{count, plural, one {Mostrar {count} hilo prioritario más} other {Mostrar {count} hilos prioritarios más}}"
+  "a4075169c1ed6ad0": "{count, plural, one {Mostrar {count} hilo prioritario más} other {Mostrar {count} hilos prioritarios más}}",
+  "d34dce937c4ba5b9": "No hay hilos que coincidan."
 }

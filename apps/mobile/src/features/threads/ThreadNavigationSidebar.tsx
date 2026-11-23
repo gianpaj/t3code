@@ -53,7 +53,7 @@ import {
 } from "../home/home-list-filter-menu";
 import {
   buildHomeProjectScopes,
-  resolveHomeProjectFilterScope,
+  resolveHomeProjectSelection,
   sortHomeProjectScopes,
 } from "../home/homeThreadList";
 import { SwipeableScrollGateProvider, useSwipeableScrollGate } from "../home/thread-swipe-actions";
@@ -165,8 +165,22 @@ function ThreadNavigationSidebarPane(props: ThreadNavigationSidebarProps) {
   const availableEnvironmentIds = new Set(
     environments.map((environment) => environment.environmentId),
   );
+  const {
+    loaded: shelfPreferencesLoaded,
+    settledShelfExpanded,
+    snoozedShelfExpanded,
+    workingShelfEnabled,
+    workingShelfExpanded,
+    priorityInboxEnabled,
+    priorityExpanded,
+    otherExpanded,
+    toggleInboxSection,
+    toggleSettledShelf,
+    toggleSnoozedShelf,
+    toggleWorkingShelf,
+  } = useThreadListV2ShelfPreferences();
   const { options, setSelectedEnvironmentId, setSelectedProjectKey, cycleReadFilter } =
-    useHomeListOptions(availableEnvironmentIds);
+    useHomeListOptions(availableEnvironmentIds, priorityInboxEnabled);
   const searchEnvironmentIds =
     options.selectedEnvironmentId === null
       ? workspaceEnvironments
@@ -217,18 +231,24 @@ function ThreadNavigationSidebarPane(props: ThreadNavigationSidebarProps) {
       ),
     [projectScopes],
   );
-  const selectedProjectScope = resolveHomeProjectFilterScope(projectScopes, projects, options);
+  const { selectedProjectKeys, selectedScopes, keysByScope } = resolveHomeProjectSelection(
+    projectScopes,
+    projects,
+    options,
+  );
+  const selectProject = (key: string | null) =>
+    setSelectedProjectKey(key, key === null ? undefined : keysByScope.get(key));
+  const projectRefs =
+    selectedScopes.length > 0 ? selectedScopes.flatMap((scope) => scope.projectRefs) : null;
+  const singleScopedProject = selectedScopes.length === 1 ? selectedScopes[0] : undefined;
   const threadSearch = useThreadSearch(
     searchEnvironmentIds,
     props.searchQuery,
-    selectedProjectScope === null
-      ? {}
-      : { projectIds: selectedProjectScope.projectRefs.map((ref) => ref.projectId) },
+    projectRefs === null ? {} : { projectIds: projectRefs.map((ref) => ref.projectId) },
   );
   // This map reaches LegendList's extraData, which re-renders every row whenever it changes
   // identity; the hook keeps it stable.
   const threadSearchMatchByKey = useThreadListSearchMatches(threads, threadSearch);
-  const selectedProjectKey = selectedProjectScope?.key ?? null;
   const projectByKey = useMemo(() => {
     const map = new Map<string, EnvironmentProject>();
     for (const project of projects) {
@@ -240,7 +260,11 @@ function ThreadNavigationSidebarPane(props: ThreadNavigationSidebarProps) {
   const [settledVisibleCount, setSettledVisibleCount] = useState(
     THREAD_LIST_V2_SETTLED_INITIAL_COUNT,
   );
-  const settledResetKey = `${options.selectedEnvironmentId ?? "all"}:${selectedProjectKey ?? "all"}:${props.searchQuery.trim()}`;
+  const settledResetKey = JSON.stringify([
+    options.selectedEnvironmentId,
+    selectedProjectKeys,
+    props.searchQuery.trim(),
+  ]);
   const [lastSettledResetKey, setLastSettledResetKey] = useState(settledResetKey);
   if (lastSettledResetKey !== settledResetKey) {
     setLastSettledResetKey(settledResetKey);
@@ -248,20 +272,6 @@ function ThreadNavigationSidebarPane(props: ThreadNavigationSidebarProps) {
   }
   const showMoreSettled = () =>
     setSettledVisibleCount((count) => count + THREAD_LIST_V2_SETTLED_PAGE_COUNT);
-  const {
-    loaded: shelfPreferencesLoaded,
-    settledShelfExpanded,
-    snoozedShelfExpanded,
-    workingShelfEnabled,
-    workingShelfExpanded,
-    priorityInboxEnabled,
-    priorityExpanded,
-    otherExpanded,
-    toggleInboxSection,
-    toggleSettledShelf,
-    toggleSnoozedShelf,
-    toggleWorkingShelf,
-  } = useThreadListV2ShelfPreferences();
   const now = useThreadListNow(threads);
   const hasOpenBranchPullRequest = useHasOpenBranchPullRequest(priorityInboxEnabled);
   const listEnvironments = useAtomValue(threadListEnvironmentsAtom);
@@ -289,7 +299,7 @@ function ThreadNavigationSidebarPane(props: ThreadNavigationSidebarProps) {
     threads: launchingThreads,
     pendingTasks,
     environmentId: options.selectedEnvironmentId,
-    projectRefs: selectedProjectScope === null ? null : selectedProjectScope.projectRefs,
+    projectRefs,
     searchQuery: props.searchQuery,
     searchMatches: threadSearchMatchByKey,
     settlementEnvironmentIds,
@@ -574,9 +584,9 @@ function ThreadNavigationSidebarPane(props: ThreadNavigationSidebarProps) {
       environments={environments}
       projects={projectFilterOptions}
       selectedEnvironmentId={options.selectedEnvironmentId}
-      selectedProjectKey={selectedProjectKey}
+      selectedProjectKeys={selectedProjectKeys}
       onEnvironmentChange={setSelectedEnvironmentId}
-      onProjectChange={setSelectedProjectKey}
+      onProjectChange={selectProject}
       readFilter={options.readFilter}
       onCycleReadFilter={cycleReadFilter}
     />
@@ -593,15 +603,15 @@ function ThreadNavigationSidebarPane(props: ThreadNavigationSidebarProps) {
         accessibilityLabel: gt("Search threads"),
       }}
       filter={{
-        customized: options.selectedEnvironmentId !== null || selectedProjectKey !== null,
+        customized: options.selectedEnvironmentId !== null || selectedProjectKeys.length > 0,
         items: buildHomeListFilterMenuItems(
           {
             environments,
             projects: projectFilterOptions,
             selectedEnvironmentId: options.selectedEnvironmentId,
-            selectedProjectKey,
+            selectedProjectKeys,
             onEnvironmentChange: setSelectedEnvironmentId,
-            onProjectChange: setSelectedProjectKey,
+            onProjectChange: selectProject,
           },
           messages,
         ),
@@ -636,9 +646,11 @@ function ThreadNavigationSidebarPane(props: ThreadNavigationSidebarProps) {
                 : threadSearch.failed
                   ? gt("Couldn't search thread messages")
                   : gt("No matching threads")
-              : selectedProjectScope !== null
-                ? gt("No threads in {project}", { project: selectedProjectScope.title })
-                : gt("No threads yet")}
+              : (priorityInboxEnabled && options.readFilter !== "all") || selectedScopes.length > 1
+                ? gt("No matching threads.")
+                : singleScopedProject !== undefined
+                  ? gt("No threads in {project}", { project: singleScopedProject.title })
+                  : gt("No threads yet")}
       </Text>
       {showAddEnvironment ? (
         <View className={Platform.OS === "android" ? "self-center" : "px-2"}>

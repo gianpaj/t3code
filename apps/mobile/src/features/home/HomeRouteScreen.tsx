@@ -29,7 +29,7 @@ import {
 } from "./home-route-visibility";
 import {
   buildHomeProjectScopes,
-  resolveHomeProjectFilterScope,
+  resolveHomeProjectSelection,
   sortHomeProjectScopes,
 } from "./homeThreadList";
 import { usePendingTaskListActions } from "./usePendingTaskListActions";
@@ -40,6 +40,7 @@ import { useSelectWorkspaceTab } from "../layout/workspace/useSelectWorkspaceTab
 import { useSelectWorkspaceDetail } from "../layout/workspace/useSelectWorkspaceDetail";
 import { WorkspaceListEmptyDetail } from "../layout/workspace/WorkspaceListEmptyDetail";
 import { WorkspaceListHeader } from "../layout/workspace/WorkspaceListHeader";
+import { useThreadListV2ShelfPreferences } from "../threads/use-thread-list-v2-shelf-preferences";
 import { buildHomeListFilterMenuItems, homeListFilterEnvironments } from "./home-list-filter-menu";
 
 export function HomeRouteScreen() {
@@ -114,12 +115,13 @@ export function HomeRouteScreen() {
     () => new Set(environments.map((environment) => environment.environmentId)),
     [environments],
   );
+  const { priorityInboxEnabled } = useThreadListV2ShelfPreferences();
   const {
     options: listOptions,
     setSelectedEnvironmentId,
     setSelectedProjectKey,
     cycleReadFilter,
-  } = useHomeListOptions(availableEnvironmentIds);
+  } = useHomeListOptions(availableEnvironmentIds, priorityInboxEnabled);
   const selectedEnvironmentId = listOptions.selectedEnvironmentId;
   const projectScopes = useMemo(
     () =>
@@ -148,8 +150,13 @@ export function HomeRouteScreen() {
       })),
     [projectScopes, threads],
   );
-  const selectedProjectKey =
-    resolveHomeProjectFilterScope(projectScopes, projects, listOptions)?.key ?? null;
+  const { selectedProjectKeys, keysByScope } = resolveHomeProjectSelection(
+    projectScopes,
+    projects,
+    listOptions,
+  );
+  const selectProject = (key: string | null) =>
+    setSelectedProjectKey(key, key === null ? undefined : keysByScope.get(key));
 
   if (layout.usesSplitView && !nativePrimaryColumn) {
     return (
@@ -174,15 +181,15 @@ export function HomeRouteScreen() {
             accessibilityLabel: gt("Search threads"),
           }}
           filter={{
-            customized: selectedEnvironmentId !== null || selectedProjectKey !== null,
+            customized: selectedEnvironmentId !== null || selectedProjectKeys.length > 0,
             items: buildHomeListFilterMenuItems(
               {
                 environments,
                 projects: projectFilterOptions,
                 selectedEnvironmentId,
-                selectedProjectKey,
+                selectedProjectKeys,
                 onEnvironmentChange: setSelectedEnvironmentId,
-                onProjectChange: setSelectedProjectKey,
+                onProjectChange: selectProject,
               },
               m,
             ),
@@ -206,7 +213,7 @@ export function HomeRouteScreen() {
           onRenameThread={renameThread}
           onRegenerateThreadTitle={regenerateThreadTitle}
           onEnvironmentChange={setSelectedEnvironmentId}
-          onProjectChange={setSelectedProjectKey}
+          onProjectChange={selectProject}
           onOpenSettings={() => selectTab("settings")}
           onSearchQueryChange={setSearchQuery}
           onSelectThread={handleSelectThread}
@@ -227,13 +234,14 @@ export function HomeRouteScreen() {
           pendingTasks={pendingTasks}
           projectGroupingMode={listOptions.projectGroupingMode}
           projects={projects}
+          projectFilterOptions={projectFilterOptions}
           projectSortOrder={listOptions.projectSortOrder}
           savedConnectionsById={savedConnectionsById}
           searchQuery={searchQuery}
           readFilter={listOptions.readFilter}
           onCycleReadFilter={cycleReadFilter}
           selectedEnvironmentId={selectedEnvironmentId}
-          selectedProjectKey={selectedProjectKey}
+          selectedProjectKeys={selectedProjectKeys}
           threads={threads}
           visible={visible}
         />

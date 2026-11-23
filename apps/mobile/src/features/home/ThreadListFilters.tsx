@@ -1,5 +1,5 @@
 import { useGT } from "gt-react-native";
-import { Pressable, ScrollView } from "react-native";
+import { Pressable, ScrollView, View } from "react-native";
 import {
   nextThreadReadFilter,
   type ThreadReadFilter,
@@ -17,7 +17,7 @@ export function ThreadListFilters(props: {
   readonly environments: ReadonlyArray<HomeListFilterMenuEnvironment>;
   readonly projects: ReadonlyArray<HomeListFilterMenuProject>;
   readonly selectedEnvironmentId: EnvironmentId | null;
-  readonly selectedProjectKey: string | null;
+  readonly selectedProjectKeys: readonly string[];
   readonly onEnvironmentChange: (environmentId: EnvironmentId | null) => void;
   readonly onProjectChange: (projectKey: string | null) => void;
   readonly readFilter?: ThreadReadFilter | undefined;
@@ -29,14 +29,79 @@ export function ThreadListFilters(props: {
   const selectedEnvironment = props.environments.find(
     (environment) => environment.environmentId === props.selectedEnvironmentId,
   );
-  const selectedProject = props.projects.find(
-    (project) => project.key === props.selectedProjectKey,
+  const hasProjectFilter = props.selectedProjectKeys.length > 0;
+  const selectedProject = props.projects.find((project) =>
+    props.selectedProjectKeys.includes(project.key),
+  );
+  const projectPicker = (compact: boolean) => (
+    <ListFilterMenu
+      icon={compact}
+      label={compact ? "" : (selectedProject?.label ?? gt("All projects"))}
+      accessibilityLabel={gt("Filter threads by project")}
+      active={hasProjectFilter}
+      actions={[
+        { id: "all", title: gt("All projects"), state: hasProjectFilter ? "off" : "on" },
+        ...props.projects.map((project) => ({
+          id: JSON.stringify(project.key),
+          title: project.label,
+          state: props.selectedProjectKeys.includes(project.key)
+            ? ("on" as const)
+            : ("off" as const),
+        })),
+      ]}
+      onSelect={(id) => {
+        if (id === "all") props.onProjectChange(null);
+        else {
+          const project = props.projects.find((candidate) => JSON.stringify(candidate.key) === id);
+          if (project) props.onProjectChange(project.key);
+        }
+      }}
+    />
   );
   const readLabels = {
     all: gt("All", { $context: "thread read filter" }),
     unread: gt("Unread", { $context: "thread read filter" }),
     read: gt("Read", { $context: "thread read filter" }),
   };
+  const readFilter = props.readFilter;
+  if (readFilter !== undefined) {
+    return (
+      <View className="flex-row items-start gap-2 px-2 pb-2">
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={gt("Read filter: {current}. Switch to {next}.", {
+            current: readLabels[readFilter],
+            next: readLabels[nextThreadReadFilter[readFilter]],
+          })}
+          onPress={props.onCycleReadFilter}
+        >
+          <Chip label={readLabels[readFilter]} selected={readFilter !== "all"} />
+        </Pressable>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          style={{ flex: 1 }}
+          contentContainerStyle={{ gap: 8 }}
+        >
+          {props.projects.slice(0, 3).map((project) => {
+            const selected = props.selectedProjectKeys.includes(project.key);
+            return (
+              <Pressable
+                key={project.key}
+                accessibilityRole="button"
+                accessibilityState={{ selected }}
+                className="max-w-32"
+                onPress={() => props.onProjectChange(project.key)}
+              >
+                <Chip label={project.label} selected={selected} />
+              </Pressable>
+            );
+          })}
+        </ScrollView>
+        {props.projects.length > 0 ? projectPicker(true) : null}
+      </View>
+    );
+  }
   return (
     <ScrollView
       horizontal
@@ -44,18 +109,6 @@ export function ThreadListFilters(props: {
       style={{ marginHorizontal: -props.gutter, overflow: "visible" }}
       contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 2, paddingBottom: 10, gap: 8 }}
     >
-      {props.readFilter !== undefined ? (
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={gt("Read filter: {current}. Switch to {next}.", {
-            current: readLabels[props.readFilter],
-            next: readLabels[nextThreadReadFilter[props.readFilter]],
-          })}
-          onPress={props.onCycleReadFilter}
-        >
-          <Chip label={readLabels[props.readFilter]} selected={props.readFilter !== "all"} />
-        </Pressable>
-      ) : null}
       <ListFilterMenu
         label={selectedEnvironment?.label ?? gt("All environments")}
         accessibilityLabel={gt("Filter threads by environment")}
@@ -85,33 +138,8 @@ export function ThreadListFilters(props: {
           }
         }}
       />
-      <ListFilterMenu
-        label={selectedProject?.label ?? gt("All projects")}
-        accessibilityLabel={gt("Filter threads by project")}
-        active={selectedProject !== undefined}
-        actions={[
-          {
-            id: "all",
-            title: gt("All projects"),
-            state: props.selectedProjectKey === null ? "on" : "off",
-          },
-          ...props.projects.map((project) => ({
-            id: JSON.stringify(project.key),
-            title: project.label,
-            state: project.key === props.selectedProjectKey ? ("on" as const) : ("off" as const),
-          })),
-        ]}
-        onSelect={(id) => {
-          if (id === "all") props.onProjectChange(null);
-          else {
-            const project = props.projects.find(
-              (candidate) => JSON.stringify(candidate.key) === id,
-            );
-            if (project) props.onProjectChange(project.key);
-          }
-        }}
-      />
-      {props.selectedEnvironmentId !== null || props.selectedProjectKey !== null ? (
+      {projectPicker(false)}
+      {props.selectedEnvironmentId !== null || hasProjectFilter ? (
         <Pressable
           accessibilityRole="button"
           accessibilityLabel={gt("Reset thread filters")}

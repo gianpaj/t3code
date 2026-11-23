@@ -46,6 +46,43 @@ it("saves the scope from every update made in one event", async () => {
     threadListFilters: { environmentId: ENVIRONMENT, projectKey: "env-1:project-1" },
   });
   expect(controls!.options.selectedEnvironmentId).toBe(ENVIRONMENT);
-  expect(controls!.options.selectedProjectKey).toBe("env-1:project-1");
+  expect(controls!.options.selectedProjectKeys).toEqual(["env-1:project-1"]);
   act(() => root.unmount());
+});
+
+it("toggles shortcuts and picker choices together and restores a saved selection", async () => {
+  harness.saved = [];
+  let controls: ReturnType<typeof useHomeListOptions> | undefined;
+  function Probe() {
+    const result = useHomeListOptions(AVAILABLE, true);
+    useLayoutEffect(() => {
+      controls = result;
+    });
+    return null;
+  }
+
+  const root = createRoot(document.createElement("div"));
+  using _root = { [Symbol.dispose]: () => act(() => root.unmount()) };
+  await act(async () =>
+    root.render(
+      <HomeListOptionsProvider
+        projectGroupingMode="repository"
+        savedFilters={{ environmentId: ENVIRONMENT, projectKey: "a", projectKeys: ["a", "b"] }}
+      >
+        <Probe />
+      </HomeListOptionsProvider>,
+    ),
+  );
+  expect(controls!.options.selectedProjectKeys).toEqual(["a", "b"]);
+  act(() => {
+    controls!.setSelectedProjectKey("c");
+    controls!.setSelectedProjectKey("b");
+    controls!.cycleReadFilter();
+    controls!.cycleReadFilter();
+  });
+  expect(harness.saved.at(-1)).toEqual({
+    threadListFilters: { environmentId: ENVIRONMENT, projectKey: "a", projectKeys: ["a", "c"] },
+  });
+  expect(controls!.options.selectedProjectKeys).toEqual(["a", "c"]);
+  expect(controls!.options.readFilter).toBe("read");
 });

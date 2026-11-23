@@ -63,7 +63,8 @@ and worktree while you stay in the new thread composer. This requires a Git proj
 
 ## Filter the sidebar
 
-On web and desktop, turn on **Priority inbox** under **Settings → Labs → Beta**.
+Turn on **Priority inbox** under **Settings → Labs → Beta**. On mobile, the filters
+appear in Home and the expanded workspace sidebar.
 Pick projects with the three shortcuts or search for more in the project picker.
 Both controls update the same selection. Choose **All projects** in the picker to clear it.
 

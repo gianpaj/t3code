@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useGT } from "gt-react-native";
 import { Pressable, ScrollView, View } from "react-native";
 import {
@@ -6,6 +7,7 @@ import {
 } from "@t3tools/client-runtime/state/thread-inbox";
 import { Chip } from "../../components/ui/Chip";
 import { SymbolView } from "../../components/ui/AppSymbol";
+import { ThreadProjectFilterSheet } from "./ThreadProjectFilterSheet";
 import { ListFilterMenu } from "../layout/workspace/ListFilterMenu";
 import type { EnvironmentId } from "@t3tools/contracts";
 import type {
@@ -28,6 +30,7 @@ export function ThreadListFilters(props: {
   readonly gutter: number;
 }) {
   const gt = useGT();
+  const [projectPickerOpen, setProjectPickerOpen] = useState(false);
   const selectedEnvironment = props.environments.find(
     (environment) => environment.environmentId === props.selectedEnvironmentId,
   );
@@ -35,10 +38,9 @@ export function ThreadListFilters(props: {
   const selectedProject = props.projects.find((project) =>
     props.selectedProjectKeys.includes(project.key),
   );
-  const projectPicker = (compact: boolean) => (
+  const projectPicker = (
     <ListFilterMenu
-      icon={compact}
-      label={compact ? "" : (selectedProject?.label ?? gt("All projects"))}
+      label={selectedProject?.label ?? gt("All projects")}
       accessibilityLabel={gt("Filter threads by project")}
       active={hasProjectFilter}
       actions={[
@@ -117,7 +119,34 @@ export function ThreadListFilters(props: {
             );
           })}
         </ScrollView>
-        {props.projects.length > 0 ? projectPicker(true) : null}
+        {props.projects.length > 0 ? (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={gt("Filter threads by project")}
+            accessibilityState={{ selected: hasProjectFilter, expanded: projectPickerOpen }}
+            className="h-8 w-8 items-center justify-center rounded-full bg-subtle active:opacity-70"
+            hitSlop={6}
+            onPress={() => setProjectPickerOpen(true)}
+          >
+            <SymbolView
+              name={
+                hasProjectFilter
+                  ? "line.3.horizontal.decrease.circle.fill"
+                  : "line.3.horizontal.decrease"
+              }
+              size={16}
+              tintColorClassName="accent-icon-muted"
+            />
+          </Pressable>
+        ) : null}
+        {projectPickerOpen ? (
+          <ThreadProjectFilterSheet
+            projects={props.projects}
+            selectedProjectKeys={props.selectedProjectKeys}
+            onProjectChange={props.onProjectChange}
+            onClose={() => setProjectPickerOpen(false)}
+          />
+        ) : null}
       </View>
     );
   }
@@ -158,7 +187,7 @@ export function ThreadListFilters(props: {
           }
         }}
       />
-      {projectPicker(false)}
+      {projectPicker}
       {props.selectedEnvironmentId !== null || hasProjectFilter ? (
         <Pressable
           accessibilityRole="button"

@@ -10,6 +10,8 @@ Engineers trying Thread stars need to keep their shortlist and recover its order
 
 A pin supplies a green star when `starColor` is absent. An explicit color or clear overrides it. The beta uses the saved pin order for inherited threads and appends other starred active threads in active order. Toggling the beta leaves thread data untouched. Settling from the beta preserves the pin so the inherited star stays findable in Settled.
 
+Home and the expanded workspace sidebar share the native beta preference and selection. A phone can try stars while a desktop continues using pins. The server owns each thread’s star, and the native list requests starred-only Settled pages when the filter is on.
+
 ## Alternatives considered
 
 - A one-time pin conversion would rewrite the thread list for every client and require a snapshot to recover the original order.

@@ -182,11 +182,13 @@ export function HomeRouteScreen() {
             accessibilityLabel: gt("Search threads"),
           }}
           filter={{
-            customized: selectedEnvironmentId !== null || selectedProjectKeys.length > 0,
+            customized:
+              selectedEnvironmentId !== null ||
+              (!priorityInboxEnabled && selectedProjectKeys.length > 0),
             items: buildHomeListFilterMenuItems(
               {
                 environments,
-                projects: projectFilterOptions,
+                projects: priorityInboxEnabled ? [] : projectFilterOptions,
                 selectedEnvironmentId,
                 selectedProjectKeys,
                 onEnvironmentChange: setSelectedEnvironmentId,

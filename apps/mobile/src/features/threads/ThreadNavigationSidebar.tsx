@@ -624,11 +624,13 @@ function ThreadNavigationSidebarPane(props: ThreadNavigationSidebarProps) {
         accessibilityLabel: gt("Search threads"),
       }}
       filter={{
-        customized: options.selectedEnvironmentId !== null || selectedProjectKeys.length > 0,
+        customized:
+          options.selectedEnvironmentId !== null ||
+          (!priorityInboxEnabled && selectedProjectKeys.length > 0),
         items: buildHomeListFilterMenuItems(
           {
             environments,
-            projects: projectFilterOptions,
+            projects: priorityInboxEnabled ? [] : projectFilterOptions,
             selectedEnvironmentId: options.selectedEnvironmentId,
             selectedProjectKeys,
             onEnvironmentChange: setSelectedEnvironmentId,

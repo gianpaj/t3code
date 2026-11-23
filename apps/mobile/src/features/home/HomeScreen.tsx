@@ -669,6 +669,7 @@ export function HomeScreen(props: HomeScreenProps) {
     selectedThreadKey,
     threadSearchMatchByKey,
     workingShelfEnabled,
+    threadStarsEnabled,
   };
 
   const hasAnyThreads =

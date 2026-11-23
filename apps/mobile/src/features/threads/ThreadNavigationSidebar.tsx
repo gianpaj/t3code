@@ -1,3 +1,4 @@
+import { useThreadStars } from "../../state/thread-stars";
 import { useHasOpenBranchPullRequest } from "../../state/use-thread-pr";
 import { useGT, useMessages } from "gt-react-native";
 import { useActiveNewTask } from "../../state/active-new-task";
@@ -66,7 +67,7 @@ import { WorkspaceSidebarColumn } from "../layout/workspace/WorkspaceSidebarColu
 import {
   ThreadListV2PendingRow,
   ThreadListV2Row,
-  ThreadListV2ShelfHeader,
+  ThreadListV2InboxHeader,
   ThreadListV2SettledShelfHeader,
   ThreadListV2ShowMoreRow,
   ThreadListV2SnoozedShelfHeader,
@@ -179,8 +180,15 @@ function ThreadNavigationSidebarPane(props: ThreadNavigationSidebarProps) {
     toggleSnoozedShelf,
     toggleWorkingShelf,
   } = useThreadListV2ShelfPreferences();
-  const { options, setSelectedEnvironmentId, setSelectedProjectKey, cycleReadFilter } =
-    useHomeListOptions(availableEnvironmentIds, priorityInboxEnabled);
+  const {
+    options,
+    setSelectedEnvironmentId,
+    setSelectedProjectKey,
+    cycleReadFilter,
+    toggleStarredFilter,
+  } = useHomeListOptions(availableEnvironmentIds, priorityInboxEnabled);
+  const { enabled: threadStarsEnabled, readStar, cycleStar } = useThreadStars();
+  const starredOnly = threadStarsEnabled && options.starredFilter;
   const searchEnvironmentIds =
     options.selectedEnvironmentId === null
       ? workspaceEnvironments
@@ -264,6 +272,7 @@ function ThreadNavigationSidebarPane(props: ThreadNavigationSidebarProps) {
     options.selectedEnvironmentId,
     selectedProjectKeys,
     props.searchQuery.trim(),
+    starredOnly,
   ]);
   const [lastSettledResetKey, setLastSettledResetKey] = useState(settledResetKey);
   if (lastSettledResetKey !== settledResetKey) {
@@ -315,6 +324,7 @@ function ThreadNavigationSidebarPane(props: ThreadNavigationSidebarProps) {
     workingShelfExpanded,
     priorityInboxEnabled,
     hasOpenBranchPullRequest,
+    threadStars: threadStarsEnabled ? { only: starredOnly, readStar } : undefined,
     priorityExpanded,
     otherExpanded,
     readFilter: options.readFilter,
@@ -390,6 +400,7 @@ function ThreadNavigationSidebarPane(props: ThreadNavigationSidebarProps) {
     listEnvironments,
     threadSearchMatchByKey,
     workingShelfEnabled,
+    threadStarsEnabled,
   };
   useThreadJumpShortcuts(listItems, handleSelectThread, props.onOpenPendingTask);
   const sidebarItemsAreEqual = (previous: SidebarListItem, item: SidebarListItem): boolean => {
@@ -448,6 +459,8 @@ function ThreadNavigationSidebarPane(props: ThreadNavigationSidebarProps) {
             hasQueuedMessages={item.hasQueuedMessages}
             snoozed={item.item.snoozed}
             pinned={item.item.pinned}
+            starColor={item.item.starColor}
+            onCycleStar={threadStarsEnabled ? cycleStar : undefined}
             wokeAt={item.item.wokeAt}
             snoozePresetMinute={item.snoozePresetMinute ?? ""}
             snoozeWakeLabelText={item.snoozeWakeLabelText}
@@ -492,12 +505,17 @@ function ThreadNavigationSidebarPane(props: ThreadNavigationSidebarProps) {
             onSettleThread={settleThread}
             snoozeSupported={snoozeEnvironmentIds.has(thread.environmentId)}
             snoozePresets={snoozePresetsByEnvironmentId.get(thread.environmentId)}
-            pinningSupported={pinningEnvironmentIds.has(thread.environmentId)}
+            pinningSupported={
+              !threadStarsEnabled && pinningEnvironmentIds.has(thread.environmentId)
+            }
             autoSettleOptOutSupported={autoSettleOptOutEnvironmentIds.has(thread.environmentId)}
             reorderSupported={
               item.item.pinned
                 ? pinReorderEnvironmentIds.has(thread.environmentId)
-                : !workingShelfEnabled && activeReorderEnvironmentIds.has(thread.environmentId)
+                : !workingShelfEnabled &&
+                  activeReorderEnvironmentIds.has(thread.environmentId) &&
+                  (!threadStarsEnabled ||
+                    (thread.pinnedAt == null && item.item.starColor === undefined))
             }
             canMoveUp={item.canMoveUp}
             canMoveDown={item.canMoveDown}
@@ -516,12 +534,12 @@ function ThreadNavigationSidebarPane(props: ThreadNavigationSidebarProps) {
       }
       case "v2-inbox-section":
         return (
-          <ThreadListV2ShelfHeader
+          <ThreadListV2InboxHeader
             kind={item.kind}
             count={item.count}
             disabled={item.disabled}
             expanded={item.expanded}
-            onToggle={() => toggleInboxSection(item.kind)}
+            onToggle={toggleInboxSection}
             pane="sidebar"
           />
         );
@@ -578,19 +596,22 @@ function ThreadNavigationSidebarPane(props: ThreadNavigationSidebarProps) {
         );
     }
   };
-  const inboxFilters = priorityInboxEnabled ? (
-    <ThreadListFilters
-      gutter={Platform.OS === "ios" ? 8 : 0}
-      environments={environments}
-      projects={projectFilterOptions}
-      selectedEnvironmentId={options.selectedEnvironmentId}
-      selectedProjectKeys={selectedProjectKeys}
-      onEnvironmentChange={setSelectedEnvironmentId}
-      onProjectChange={selectProject}
-      readFilter={options.readFilter}
-      onCycleReadFilter={cycleReadFilter}
-    />
-  ) : null;
+  const inboxFilters =
+    priorityInboxEnabled || threadStarsEnabled ? (
+      <ThreadListFilters
+        gutter={Platform.OS === "ios" ? 8 : 0}
+        environments={environments}
+        projects={projectFilterOptions}
+        selectedEnvironmentId={options.selectedEnvironmentId}
+        selectedProjectKeys={selectedProjectKeys}
+        onEnvironmentChange={setSelectedEnvironmentId}
+        onProjectChange={selectProject}
+        readFilter={priorityInboxEnabled ? options.readFilter : undefined}
+        onCycleReadFilter={cycleReadFilter}
+        starredOnly={starredOnly}
+        onToggleStarredFilter={threadStarsEnabled ? toggleStarredFilter : undefined}
+      />
+    ) : null;
   const header = (
     <WorkspaceListHeader
       accessibilityLabel={gt("{appName}, Threads", { appName: "T3 Code" })}
@@ -646,7 +667,9 @@ function ThreadNavigationSidebarPane(props: ThreadNavigationSidebarProps) {
                 : threadSearch.failed
                   ? gt("Couldn't search thread messages")
                   : gt("No matching threads")
-              : (priorityInboxEnabled && options.readFilter !== "all") || selectedScopes.length > 1
+              : (priorityInboxEnabled && options.readFilter !== "all") ||
+                  starredOnly ||
+                  selectedScopes.length > 1
                 ? gt("No matching threads.")
                 : singleScopedProject !== undefined
                   ? gt("No threads in {project}", { project: singleScopedProject.title })
@@ -726,7 +749,7 @@ function ThreadNavigationSidebarPane(props: ThreadNavigationSidebarProps) {
           overflow: "hidden",
         }}
       >
-        {listItems.length === 0 && !priorityInboxEnabled ? (
+        {listItems.length === 0 && !priorityInboxEnabled && !threadStarsEnabled ? (
           <View className="flex-1 items-center justify-center">{listEmpty}</View>
         ) : (
           <SwipeableScrollGateProvider enabled={swipeEnabled}>

@@ -19,6 +19,7 @@ import { supportsSharedSettingsSync } from "@t3tools/client-runtime/state/shared
 import { AppText as Text } from "../../components/ui/AppText";
 import { useEnvironments } from "../../state/environments";
 import { mobilePreferencesAtom, saveMobilePreferences } from "../../state/preferences";
+import { threadStarsAvailableAtom } from "../../state/thread-stars";
 import { serverEnvironment } from "../../state/server";
 import { useAtomCommand } from "../../state/use-atom-command";
 import { SettingsSection } from "./components/SettingsSection";
@@ -38,6 +39,7 @@ export function SettingsLabsRouteScreen() {
   const preferences = useAtomValue(mobilePreferencesAtom);
   const savePreferences = useAtomCommand(saveMobilePreferences);
   const ready = AsyncResult.isSuccess(preferences);
+  const threadStarsAvailable = useAtomValue(threadStarsAvailableAtom);
 
   return (
     <SettingsScreen title={gt("Labs")}>
@@ -56,6 +58,22 @@ export function SettingsLabsRouteScreen() {
             disabled={!ready}
             onValueChange={(priorityInboxEnabled) => {
               void savePreferences({ priorityInboxEnabled });
+            }}
+          />
+          <SettingsSwitchRow
+            icon="star"
+            label={gt("Thread stars")}
+            subtitle={
+              threadStarsAvailable
+                ? gt(
+                    "Try colored stars in place of pins. Your pinned threads return when you turn this off.",
+                  )
+                : gt("Update the connected T3 Code servers to use Thread stars.")
+            }
+            value={ready && preferences.value.threadStarsEnabled === true}
+            disabled={!ready}
+            onValueChange={(threadStarsEnabled) => {
+              void savePreferences({ threadStarsEnabled });
             }}
           />
         </SettingsSection>

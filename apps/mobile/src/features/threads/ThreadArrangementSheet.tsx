@@ -28,6 +28,7 @@ import {
   threadArrangementOpenAtom,
 } from "../../state/thread-order";
 import { queuedThreadKeysAtom } from "../../state/use-thread-outbox";
+import { useThreadStars } from "../../state/thread-stars";
 import { useThreadListActions } from "../home/useThreadListActions";
 import {
   createThreadMovePlanner,
@@ -192,6 +193,7 @@ function ThreadArrangementSheet(props: { onClose: () => void }) {
   const holdingRows = useAtomValue(steadyShellsHoldingAtom);
   const { moveThread } = useThreadListActions();
   const { workingShelfEnabled } = useThreadListV2ShelfPreferences();
+  const { enabled: threadStarsEnabled, readStar } = useThreadStars();
   const now = useThreadListNow(threads);
   const [expanded, setExpanded] = useState({ snoozed: false, settled: false });
   const [settledVisibleCount, setSettledVisibleCount] = useState(
@@ -219,14 +221,22 @@ function ThreadArrangementSheet(props: { onClose: () => void }) {
       (thread) => thread.archivedAt === null && !visible.has(keyOf(thread)),
     );
     return {
-      pinned,
+      pinned: threadStarsEnabled ? [] : pinned,
       active: workingShelfEnabled
         ? sortInboxThreadsByReturn(active, threadListInboxReturns.returnedAt)
         : active,
       snoozed: parked.filter((thread) => effectiveSnoozed(thread, { now })),
       settled: sortSettledThreads(parked.filter((thread) => !effectiveSnoozed(thread, { now }))),
     };
-  }, [threads, configs, now, queuedThreadKeys, pendingOrder, workingShelfEnabled]);
+  }, [
+    threads,
+    configs,
+    now,
+    queuedThreadKeys,
+    pendingOrder,
+    workingShelfEnabled,
+    threadStarsEnabled,
+  ]);
   const listedSettled = sections.settled.filter(olderSettledShelf.isListed);
   useOlderSettledShelfGrowth(olderSettledShelf, listedSettled);
   const visibleSettled = listedSettled.slice(0, settledVisibleCount);
@@ -250,11 +260,13 @@ function ThreadArrangementSheet(props: { onClose: () => void }) {
     const result: Row[] = [];
     let offset = 0;
     for (const section of ["pinned", "active", "snoozed", "settled"] as const) {
+      if (section === "pinned" && threadStarsEnabled) continue;
       if (section === "snoozed" && sections[section].length === 0) continue;
       result.push({ key: section, section, offset, height: headerHeight });
       offset += headerHeight;
       if ((section === "snoozed" || section === "settled") && !expanded[section]) continue;
       for (const thread of section === "settled" ? visibleSettled : sections[section]) {
+        if (section === "active" && threadStarsEnabled && readStar(thread) !== null) continue;
         result.push({ key: keyOf(thread), section, thread, offset, height: rowHeight });
         offset += rowHeight;
       }
@@ -264,7 +276,16 @@ function ThreadArrangementSheet(props: { onClose: () => void }) {
       }
     }
     return result;
-  }, [sections, expanded, visibleSettled, settledCount, rowHeight, headerHeight]);
+  }, [
+    sections,
+    expanded,
+    visibleSettled,
+    settledCount,
+    rowHeight,
+    headerHeight,
+    threadStarsEnabled,
+    readStar,
+  ]);
   const list = useRef<LegendListRef>(null);
   const geometry = useRef({ height: 0, offset: 0 });
   const drag = useRef<Drag | null>(null);
@@ -313,6 +334,7 @@ function ThreadArrangementSheet(props: { onClose: () => void }) {
     let destination: Destination | null = null;
     if (
       target &&
+      !(threadStarsEnabled && target.section === "active" && current.thread.pinnedAt != null) &&
       y >= 0 &&
       y <= height &&
       (target.section === "pinned" || target.section === "active" || target.section === "settled")
@@ -414,7 +436,11 @@ function ThreadArrangementSheet(props: { onClose: () => void }) {
                 accessibilityLabel={gt("Close arrange threads")}
               />
               <Text className="px-5 pb-3 text-sm text-foreground-muted">
-                <T>Drag to reorder, pin, or settle. Changes save when you drop.</T>
+                {threadStarsEnabled ? (
+                  <T>Drag to reorder or settle. Changes save when you drop.</T>
+                ) : (
+                  <T>Drag to reorder, pin, or settle. Changes save when you drop.</T>
+                )}
               </Text>
               <View
                 onLayout={(event) => {
@@ -458,6 +484,12 @@ function ThreadArrangementSheet(props: { onClose: () => void }) {
                           label: string;
                         }>((section) => {
                           if (section === item.section) return [];
+                          if (
+                            threadStarsEnabled &&
+                            (section === "pinned" ||
+                              (section === "active" && thread.pinnedAt != null))
+                          )
+                            return [];
                           const label = threadDragAction(item.section, section, m);
                           if (!label) return [];
                           if (section === "settled")

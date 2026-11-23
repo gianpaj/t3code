@@ -171,6 +171,7 @@ export interface Preferences {
   readonly toolCallVisibility?: ToolCallVisibility;
   readonly workingShelfEnabled?: boolean;
   readonly priorityInboxEnabled?: boolean;
+  readonly threadStarsEnabled?: boolean;
   readonly threadListPriorityExpanded?: boolean;
   readonly threadListOtherExpanded?: boolean;
   readonly useLastProjectForNewThreads?: boolean;
@@ -264,6 +265,7 @@ function sanitizePreferences(parsed: Preferences): Preferences {
     toolCallVisibility?: ToolCallVisibility;
     workingShelfEnabled?: boolean;
     priorityInboxEnabled?: boolean;
+    threadStarsEnabled?: boolean;
     threadListPriorityExpanded?: boolean;
     threadListOtherExpanded?: boolean;
     useLastProjectForNewThreads?: boolean;
@@ -403,6 +405,9 @@ function sanitizePreferences(parsed: Preferences): Preferences {
   }
   if (typeof parsed.priorityInboxEnabled === "boolean") {
     preferences.priorityInboxEnabled = parsed.priorityInboxEnabled;
+  }
+  if (typeof parsed.threadStarsEnabled === "boolean") {
+    preferences.threadStarsEnabled = parsed.threadStarsEnabled;
   }
   if (typeof parsed.threadListPriorityExpanded === "boolean") {
     preferences.threadListPriorityExpanded = parsed.threadListPriorityExpanded;

@@ -2,6 +2,7 @@ import { scopedThreadKey } from "@t3tools/client-runtime/environment";
 import type { EnvironmentThreadShell } from "@t3tools/client-runtime/state/models";
 import {
   CommandId,
+  nextThreadStarColor,
   resolveThreadStar,
   type ScopedThreadRef,
   type ThreadStarColor,
@@ -22,7 +23,6 @@ import { useAtomCommand } from "../../state/use-atom-command";
 import { waitForAtomValue } from "../../state/waitForAtomValue";
 import { stackedThreadToast } from "../ui/toast";
 
-const nextColor = { green: "yellow", yellow: "blue", blue: null } as const;
 export const threadStarClassName = {
   green: "text-green-600 dark:text-green-400",
   yellow: "text-yellow-600 dark:text-yellow-400",
@@ -68,7 +68,7 @@ export function useThreadStars() {
     if (thread === null) return;
     const pending = new Map(appAtomRegistry.get(pendingStarsAtom));
     const color = visibleThreadStar(thread, pending.get(key));
-    const update = { color: color === null ? "green" : nextColor[color] } satisfies PendingStar;
+    const update = { color: nextThreadStarColor(color) } satisfies PendingStar;
     if (update.color === null) onClear?.();
     pending.set(key, update);
     appAtomRegistry.set(pendingStarsAtom, pending);

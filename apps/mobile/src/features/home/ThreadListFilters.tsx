@@ -22,6 +22,8 @@ export function ThreadListFilters(props: {
   readonly onProjectChange: (projectKey: string | null) => void;
   readonly readFilter?: ThreadReadFilter | undefined;
   readonly onCycleReadFilter?: (() => void) | undefined;
+  readonly starredOnly?: boolean | undefined;
+  readonly onToggleStarredFilter?: (() => void) | undefined;
   /** List padding the scroller bleeds through so pills start where row content does. */
   readonly gutter: number;
 }) {
@@ -63,6 +65,22 @@ export function ThreadListFilters(props: {
     unread: gt("Unread", { $context: "thread read filter" }),
     read: gt("Read", { $context: "thread read filter" }),
   };
+  const starFilter = props.onToggleStarredFilter ? (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={gt("Starred")}
+      accessibilityState={{ selected: props.starredOnly === true }}
+      className="h-8 w-8 items-center justify-center rounded-full bg-subtle active:opacity-70"
+      hitSlop={6}
+      onPress={props.onToggleStarredFilter}
+    >
+      <SymbolView
+        name={props.starredOnly ? "star.fill" : "star"}
+        size={16}
+        tintColorClassName="accent-icon-muted"
+      />
+    </Pressable>
+  ) : null;
   const readFilter = props.readFilter;
   if (readFilter !== undefined) {
     return (
@@ -77,6 +95,7 @@ export function ThreadListFilters(props: {
         >
           <Chip label={readLabels[readFilter]} selected={readFilter !== "all"} />
         </Pressable>
+        {starFilter}
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
@@ -109,6 +128,7 @@ export function ThreadListFilters(props: {
       style={{ marginHorizontal: -props.gutter, overflow: "visible" }}
       contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 2, paddingBottom: 10, gap: 8 }}
     >
+      {starFilter}
       <ListFilterMenu
         label={selectedEnvironment?.label ?? gt("All environments")}
         accessibilityLabel={gt("Filter threads by environment")}

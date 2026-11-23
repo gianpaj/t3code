@@ -30,6 +30,8 @@ import {
   type EnvironmentId,
   type EnvironmentMachineKind,
 } from "@t3tools/contracts";
+import { useAtomValue } from "@effect/atom-react";
+import type { ThreadStarColor } from "@t3tools/contracts";
 import { toServerClock } from "@t3tools/client-runtime/clock";
 import type { SnoozePresetSetting } from "@t3tools/contracts/settings";
 import { canSnooze } from "@t3tools/client-runtime/state/thread-settled";
@@ -366,7 +368,11 @@ export function ThreadListV2ShelfHeader(
   const label = m(copy.label);
   return (
     <ThreadListV2Section
-      label={props.expanded ? label : gt("{label} ({count})", { label, count: props.count })}
+      label={
+        props.expanded && props.kind !== "priority" && props.kind !== "other"
+          ? label
+          : gt("{label} ({count})", { label, count: props.count })
+      }
       pane={props.pane}
       tone={props.kind === "snoozed" ? "snoozed" : "default"}
       disclosure={{
@@ -377,6 +383,21 @@ export function ThreadListV2ShelfHeader(
         accessibilityHint: m(props.expanded ? copy.collapse : copy.expand),
       }}
     />
+  );
+}
+
+export function ThreadListV2InboxHeader(
+  props: Omit<ThreadListV2ShelfHeaderProps, "onToggle"> & {
+    readonly kind: "priority" | "other" | "starred";
+    readonly onToggle: (kind: "priority" | "other") => void;
+  },
+) {
+  const gt = useGT();
+  const { kind, onToggle, ...shelf } = props;
+  return kind === "starred" ? (
+    <ThreadListV2Section label={gt("Starred")} pane={shelf.pane} />
+  ) : (
+    <ThreadListV2ShelfHeader {...shelf} kind={kind} onToggle={() => onToggle(kind)} />
   );
 }
 
@@ -764,12 +785,22 @@ export const ThreadListV2PendingRow = memo(function ThreadListV2PendingRow(props
   );
 });
 
+const THREAD_STAR_COLOR = {
+  green: "accent-adaptive-emerald-600-400",
+  yellow: "accent-warning-foreground",
+  blue: "accent-adaptive-sky-600-400",
+} satisfies Record<ThreadStarColor, string>;
+
+const THREAD_STAR_PERMISSION = { type: "thread.star.set" };
+
 export const ThreadListV2Row = memo(function ThreadListV2Row(props: {
   readonly thread: EnvironmentThreadShell;
   readonly variant: "card" | "slim";
   readonly hasQueuedMessages?: boolean;
   readonly snoozed?: boolean;
   readonly pinned?: boolean;
+  readonly starColor?: ThreadStarColor | undefined;
+  readonly onCycleStar?: ((thread: EnvironmentThreadShell) => void) | undefined;
   readonly wokeAt: string | null;
   readonly snoozeWakeLabelText?: string;
   readonly timeLabel: string;
@@ -848,6 +879,8 @@ export const ThreadListV2Row = memo(function ThreadListV2Row(props: {
     onUnsettleThread,
     onArchiveThread,
     onPinThread,
+    onCycleStar,
+    starColor,
     onUnpinThread,
     onSetThreadAutoSettle,
     onMoveThread,
@@ -926,6 +959,7 @@ export const ThreadListV2Row = memo(function ThreadListV2Row(props: {
       timeLabel,
       snoozeWakeLabel: snoozedRow ? snoozeWakeLabelText : undefined,
       providerNameLabel,
+      starLabel: starColor === undefined ? undefined : gt("Starred"),
       hasQueuedMessages: props.hasQueuedMessages === true,
       regeneratingTitle: isRegeneratingTitle,
     },
@@ -953,6 +987,21 @@ export const ThreadListV2Row = memo(function ThreadListV2Row(props: {
   const handleDelete = useCallback(() => onDeleteThread(thread), [onDeleteThread, thread]);
   const handleRename = useCallback(() => onRenameThread(thread), [onRenameThread, thread]);
   const canOperateThread = useEnvironmentScope(thread.environmentId, AuthOrchestrationOperateScope);
+  const canCycleStar = useAtomValue(
+    threadEnvironment.setStar.permissionAtom(
+      onCycleStar ? thread.environmentId : null,
+      THREAD_STAR_PERMISSION,
+    ),
+  );
+  const starIndicator =
+    starColor === undefined ? null : (
+      <SymbolView
+        name="star.fill"
+        size={12}
+        tintColorClassName={THREAD_STAR_COLOR[starColor]}
+        type="monochrome"
+      />
+    );
   const canShareWithGuest = useCanShareWithGuest(thread.environmentId);
   const navigation = useNavigation();
   const handleRegenerateTitle = useCallback(
@@ -1056,6 +1105,27 @@ export const ThreadListV2Row = memo(function ThreadListV2Row(props: {
         : [],
     [gt, props.pinningSupported, thread.pinnedAt],
   );
+  const starMenuTitle =
+    starColor === undefined
+      ? gt("Add green star")
+      : starColor === "green"
+        ? gt("Green star. Change to yellow")
+        : starColor === "yellow"
+          ? gt("Yellow star. Change to blue")
+          : gt("Blue star. Remove star");
+  const starMenuItems = useMemo<MenuAction[]>(
+    () =>
+      canCycleStar
+        ? [
+            {
+              id: "cycle-star",
+              title: starMenuTitle,
+              image: starColor === undefined ? "star" : "star.fill",
+            },
+          ]
+        : [],
+    [canCycleStar, starColor, starMenuTitle],
+  );
   const autoSettleMenuItems = useMemo<MenuAction[]>(
     () =>
       props.autoSettleOptOutSupported
@@ -1142,7 +1212,7 @@ export const ThreadListV2Row = memo(function ThreadListV2Row(props: {
           nested,
           direct: [...direct, localized(SNOOZED_MENU_ACTIONS[0]!)],
           reorder: [],
-          pin: [],
+          pin: starMenuItems,
           secondary: [
             ...titleMenuItems,
             ...autoSettleMenuItems,
@@ -1159,7 +1229,7 @@ export const ThreadListV2Row = memo(function ThreadListV2Row(props: {
           nested,
           direct: [...direct, localized(LEGACY_MENU_ACTIONS[0]!)],
           reorder: reorderMenuItems,
-          pin: pinMenuItems,
+          pin: [...pinMenuItems, ...starMenuItems],
           secondary: [...titleMenuItems, localized(LEGACY_MENU_ACTIONS[1]!)],
         },
         m,
@@ -1173,7 +1243,7 @@ export const ThreadListV2Row = memo(function ThreadListV2Row(props: {
           reorder: reorderMenuItems.filter(
             (action) => action.id !== "move-up" && action.id !== "move-down",
           ),
-          pin: pinMenuItems,
+          pin: [...pinMenuItems, ...starMenuItems],
           secondary: [
             ...titleMenuItems,
             ...autoSettleMenuItems,
@@ -1202,7 +1272,7 @@ export const ThreadListV2Row = memo(function ThreadListV2Row(props: {
             : []),
         ],
         reorder: reorderMenuItems,
-        pin: pinMenuItems,
+        pin: [...pinMenuItems, ...starMenuItems],
         secondary: [
           ...titleMenuItems,
           ...autoSettleMenuItems,
@@ -1217,6 +1287,7 @@ export const ThreadListV2Row = memo(function ThreadListV2Row(props: {
     canShareWithGuest,
     canUnsettle,
     pinMenuItems,
+    starMenuItems,
     props.settlementSupported,
     reorderMenuItems,
     snoozePresetActions,
@@ -1234,6 +1305,7 @@ export const ThreadListV2Row = memo(function ThreadListV2Row(props: {
       if (nativeEvent.event === "unsettle") handleUnsettle();
       if (nativeEvent.event === "unsnooze") handleUnsnooze();
       if (nativeEvent.event === "pin") handlePin();
+      if (nativeEvent.event === "cycle-star") onCycleStar?.(thread);
       if (nativeEvent.event === "unpin") handleUnpin();
       if (nativeEvent.event === "auto-settle:enabled") handleSetAutoSettle(true);
       if (nativeEvent.event === "auto-settle:disabled") handleSetAutoSettle(false);
@@ -1303,6 +1375,7 @@ export const ThreadListV2Row = memo(function ThreadListV2Row(props: {
       handleMoveDown,
       handleMoveUp,
       handlePin,
+      onCycleStar,
       handleSettle,
       handleSnooze,
       handleSetAutoSettle,
@@ -1426,6 +1499,7 @@ export const ThreadListV2Row = memo(function ThreadListV2Row(props: {
         </Text>
         <View className="flex-row items-center gap-1.5" style={{ minHeight: titleLineHeight }}>
           {props.hasQueuedMessages ? <QueuedMessageIcon selected={selected} /> : null}
+          {starIndicator}
           {pinnedRow ? (
             <SymbolView
               name="pin"
@@ -1758,6 +1832,7 @@ export const ThreadListV2Row = memo(function ThreadListV2Row(props: {
             ) : null}
           </View>
           {props.hasQueuedMessages ? <QueuedMessageIcon selected={selected} /> : null}
+          {starIndicator}
           <Text
             className={cn(
               "text-sm tabular-nums",

@@ -16,6 +16,7 @@ import { m } from "../../i18n/messages";
 import { scopedThreadKey } from "../../lib/scopedEntities";
 import { refreshArchivedThreadsForEnvironment } from "../archive/useArchivedThreadSnapshots";
 import { pinOrderKeyBetween } from "@t3tools/client-runtime/state/thread-sort";
+import { threadStarsEnabledAtom } from "../../state/thread-stars";
 import { appAtomRegistry } from "../../state/atom-registry";
 import { environmentServerConfigsAtom } from "../../state/server";
 import { connectedEnvironmentIdsAtom } from "../../state/presentation";
@@ -119,7 +120,10 @@ function useThreadActionExecutor(
     action: ThreadListAction,
     thread: EnvironmentThreadShell,
     onStarted?: () => void,
-    restoreUnsettledAt?: string | null,
+    options?: {
+      readonly restoreUnsettledAt?: string | null | undefined;
+      readonly preservePin?: boolean;
+    },
   ) => {
     if (!checkThreadOperationPermission(thread, actionFailureTitle(action))) return false;
     const key = scopedThreadKey(thread.environmentId, thread.id);
@@ -166,7 +170,9 @@ function useThreadActionExecutor(
                 input: {
                   threadId: thread.id,
                   reason: "user",
-                  ...(restoreUnsettledAt === undefined ? {} : { restoreUnsettledAt }),
+                  ...(options?.restoreUnsettledAt === undefined
+                    ? {}
+                    : { restoreUnsettledAt: options.restoreUnsettledAt }),
                 },
               })
             : await (
@@ -179,7 +185,10 @@ function useThreadActionExecutor(
                       : deleteMutation
               )({
                 environmentId: thread.environmentId,
-                input: { threadId: thread.id },
+                input: {
+                  threadId: thread.id,
+                  ...(action === "settle" && options?.preservePin ? { preservePin: true } : {}),
+                },
               }),
         (result) => result._tag === "Success",
       );
@@ -332,13 +341,19 @@ export function useThreadListActions(): {
     });
   const settleThread = async (thread: EnvironmentThreadShell) => {
     const key = scopedThreadKey(thread.environmentId, thread.id);
-    const plan = ThreadUndo.planThreadUndo("settle", thread);
+    const preservePin = appAtomRegistry.get(threadStarsEnabledAtom);
+    const plan = ThreadUndo.planThreadUndo("settle", thread, { preservePin });
     let claim: ReturnType<typeof ThreadUndo.begin> | undefined;
-    const succeeded = await executeAction("settle", thread, () => {
-      ThreadUndo.invalidate("pin", key);
-      ThreadUndo.invalidate("snooze", key);
-      claim = ThreadUndo.begin("settle", key);
-    });
+    const succeeded = await executeAction(
+      "settle",
+      thread,
+      () => {
+        ThreadUndo.invalidate("pin", key);
+        ThreadUndo.invalidate("snooze", key);
+        claim = ThreadUndo.begin("settle", key);
+      },
+      { preservePin },
+    );
     if (claim) {
       if (succeeded) offerUndo(thread, "Settled", claim, plan);
       else claim.finish();
@@ -458,7 +473,7 @@ export function useThreadListActions(): {
   const unsettleThread = async (
     thread: EnvironmentThreadShell,
     restoreUnsettledAt?: string | null,
-  ) => (await executeAction("unsettle", thread, undefined, restoreUnsettledAt)) === true;
+  ) => (await executeAction("unsettle", thread, undefined, { restoreUnsettledAt })) === true;
   const pinThread = async (thread: EnvironmentThreadShell, restoreOrderKey?: string) => {
     if (!checkThreadOperationPermission(thread, m(msg("Could not pin thread")))) return false;
     if (!environmentConfigLoaded(thread.environmentId)) {
@@ -677,6 +692,12 @@ export function useThreadListActions(): {
         : thread.pinnedAt != null
           ? "pinned"
           : "active";
+    if (
+      appAtomRegistry.get(threadStarsEnabledAtom) &&
+      (section === "pinned" || (section === "active" && thread.pinnedAt != null))
+    ) {
+      return false;
+    }
     if (section === "settled") {
       if (!environmentConfigLoaded(thread.environmentId)) return false;
       appAtomRegistry.set(threadDropBusyAtom, true);

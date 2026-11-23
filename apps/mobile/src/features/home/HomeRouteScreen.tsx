@@ -121,6 +121,7 @@ export function HomeRouteScreen() {
     setSelectedEnvironmentId,
     setSelectedProjectKey,
     cycleReadFilter,
+    toggleStarredFilter,
   } = useHomeListOptions(availableEnvironmentIds, priorityInboxEnabled);
   const selectedEnvironmentId = listOptions.selectedEnvironmentId;
   const projectScopes = useMemo(
@@ -239,6 +240,8 @@ export function HomeRouteScreen() {
           savedConnectionsById={savedConnectionsById}
           searchQuery={searchQuery}
           readFilter={listOptions.readFilter}
+          starredFilter={listOptions.starredFilter}
+          onToggleStarredFilter={toggleStarredFilter}
           onCycleReadFilter={cycleReadFilter}
           selectedEnvironmentId={selectedEnvironmentId}
           selectedProjectKeys={selectedProjectKeys}

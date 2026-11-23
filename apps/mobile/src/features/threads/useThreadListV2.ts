@@ -67,6 +67,7 @@ export function useThreadListV2(input: {
   readonly priorityExpanded?: boolean;
   readonly otherExpanded?: boolean;
   readonly readFilter?: LayoutInput["readFilter"];
+  readonly threadStars?: LayoutInput["threadStars"];
   readonly hasOpenBranchPullRequest?: NonNullable<
     LayoutInput["priorityInbox"]
   >["hasOpenBranchPullRequest"];
@@ -74,8 +75,16 @@ export function useThreadListV2(input: {
   readonly settledShelfExpanded: boolean;
   readonly selectedThreadKey: string | null;
 }) {
-  const { threads, workingShelfEnabled } = input;
-  const priorityScope = JSON.stringify([input.environmentId, input.projectRefs, input.readFilter]);
+  const { threads, workingShelfEnabled, threadStars } = input;
+  const starredOnly = threadStars?.only === true;
+  const useLegacyPins = threadStars === undefined;
+  const priorityScope = JSON.stringify([
+    input.environmentId,
+    input.projectRefs,
+    input.readFilter,
+    threadStars !== undefined,
+    starredOnly,
+  ]);
   const [priorityTail, setPriorityTail] = useState({ scope: priorityScope, expanded: false });
   if (priorityTail.scope !== priorityScope) {
     setPriorityTail({ scope: priorityScope, expanded: false });
@@ -117,7 +126,7 @@ export function useThreadListV2(input: {
         }),
       });
     return new Map([
-      ...sectionAvailability("pinned"),
+      ...(useLegacyPins ? sectionAvailability("pinned") : []),
       ...(workingShelfEnabled ? [] : sectionAvailability("active")),
     ]);
   }, [
@@ -130,6 +139,7 @@ export function useThreadListV2(input: {
     input.snoozeEnvironmentIds,
     input.queuedThreadKeys,
     workingShelfEnabled,
+    useLegacyPins,
   ]);
   // Older settled threads load in pages; the shelf lists them only as far as they are loaded.
   const scopes = useMemo(
@@ -139,9 +149,15 @@ export function useThreadListV2(input: {
             environmentId: input.environmentId,
             projectRefs: input.projectRefs,
             settlementEnvironmentIds: input.settlementEnvironmentIds,
-          })
+          }).map((scope) => (starredOnly ? { ...scope, starredOnly: true as const } : scope))
         : [],
-    [input.environmentId, input.projectRefs, input.settlementEnvironmentIds, showShelves],
+    [
+      input.environmentId,
+      input.projectRefs,
+      input.settlementEnvironmentIds,
+      showShelves,
+      starredOnly,
+    ],
   );
   const olderSettledShelf = useOlderSettledShelf({
     scopes,
@@ -166,6 +182,7 @@ export function useThreadListV2(input: {
         now: layoutTime,
         workingShelfEnabled,
         readFilter,
+        ...(threadStars === undefined ? {} : { threadStars }),
         ...(input.priorityInboxEnabled
           ? {
               priorityInbox: {
@@ -209,6 +226,7 @@ export function useThreadListV2(input: {
       layoutTime,
       workingShelfEnabled,
       readFilter,
+      threadStars,
       input.priorityInboxEnabled,
       input.priorityExpanded,
       input.otherExpanded,
@@ -228,6 +246,7 @@ export function useThreadListV2(input: {
   useOlderSettledShelfGrowth(olderSettledShelf, layout.listedSettledThreads);
   const contentOnlyThreadKeys = useKeySet([...layout.contentOnlyThreadKeys].sort().join("\n"));
   const pendingTasks = useMemo(() => {
+    if (starredOnly) return [];
     const scopedProjectKeys =
       input.projectRefs == null
         ? null
@@ -244,7 +263,7 @@ export function useThreadListV2(input: {
           )) &&
         (searchQuery.length === 0 || pendingTask.title.toLocaleLowerCase().includes(searchQuery)),
     );
-  }, [input.projectRefs, input.searchQuery, input.pendingTasks, input.environmentId]);
+  }, [input.projectRefs, input.searchQuery, input.pendingTasks, input.environmentId, starredOnly]);
   const items = useMemo(
     () =>
       buildThreadListV2ListItems({

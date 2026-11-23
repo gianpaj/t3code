@@ -17,6 +17,7 @@ const state = vi.hoisted(() => ({
   connectedEnvironmentIds: [] as EnvironmentId[],
   pendingOrder: null as object | null,
   dropBusy: false,
+  threadStarsEnabled: false,
   holdingRows: false,
   failedAction: null as string | null,
   titleOutcome: null as ThreadTitleRegenerationOutcome | null,
@@ -70,6 +71,9 @@ vi.mock("../../state/session", () => ({
 vi.mock("../../state/presentation", () => ({
   connectedEnvironmentIdsAtom: "connected-environments",
 }));
+vi.mock("../../state/thread-stars", () => ({
+  threadStarsEnabledAtom: "thread-stars-enabled",
+}));
 vi.mock("../../state/server", () => ({
   environmentServerConfigsAtom: "server-configs",
 }));
@@ -80,32 +84,34 @@ vi.mock("../../state/atom-registry", async () => {
       state.dropBusy = value;
     },
     get: (atom: string) =>
-      atom === "connected-environments"
-        ? state.connectedEnvironmentIds
-        : atom === "thread-drop-busy"
-          ? state.dropBusy
-          : atom === "steady-shells-holding"
-            ? state.holdingRows
-            : atom === "thread-shells"
-              ? state.shells
-              : atom === "queued-thread-keys"
-                ? new Set<string>()
-                : new Map(
-                    [...state.scopes.keys()].map((environmentId) => [
-                      environmentId,
-                      {
-                        environment: {
-                          capabilities: {
-                            threadSettlement: true,
-                            threadSnooze: true,
-                            threadPinning: true,
-                            threadPinReorder: true,
-                            threadTitleRegeneration: true,
+      atom === "thread-stars-enabled"
+        ? state.threadStarsEnabled
+        : atom === "connected-environments"
+          ? state.connectedEnvironmentIds
+          : atom === "thread-drop-busy"
+            ? state.dropBusy
+            : atom === "steady-shells-holding"
+              ? state.holdingRows
+              : atom === "thread-shells"
+                ? state.shells
+                : atom === "queued-thread-keys"
+                  ? new Set<string>()
+                  : new Map(
+                      [...state.scopes.keys()].map((environmentId) => [
+                        environmentId,
+                        {
+                          environment: {
+                            capabilities: {
+                              threadSettlement: true,
+                              threadSnooze: true,
+                              threadPinning: true,
+                              threadPinReorder: true,
+                              threadTitleRegeneration: true,
+                            },
                           },
                         },
-                      },
-                    ]),
-                  ),
+                      ]),
+                    ),
   };
   // Real atoms such as composerDraftsAtom go to a real registry; strings are stubbed state.
   return {
@@ -218,6 +224,7 @@ beforeEach(() => {
   state.onArchivedRefresh = undefined;
   state.pendingOrder = null;
   state.dropBusy = false;
+  state.threadStarsEnabled = false;
   state.holdingRows = false;
   state.scopes = new Map([
     [primaryEnvironmentId, new Set([AuthOrchestrationOperateScope])],
@@ -661,4 +668,17 @@ describe("thread archive guard", () => {
     expect(await useThreadListActions().archiveThread(makeThread())).toBe(false);
     expect(state.requests).toEqual([]);
   });
+});
+
+it("preserves a legacy pin when settling with stars and only unsets settlement on undo", async () => {
+  state.threadStarsEnabled = true;
+  const thread = makeThread({
+    pinnedAt: "2026-09-02T00:00:00.000Z",
+    pinOrderKey: "m",
+  });
+  const actions = useThreadListActions();
+  expect(await actions.settleThread(thread)).toBe(true);
+  expect(state.requests[0]).toMatchObject({ action: "settle", input: { preservePin: true } });
+  await readThreadUndoNotice()?.undo();
+  expect(state.requests.map(({ action }) => action)).toEqual(["settle", "unsettle"]);
 });

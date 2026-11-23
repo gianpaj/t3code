@@ -855,7 +855,9 @@ export function useThreadActions() {
     // oxlint-disable-next-line react/purity -- runs in an event handler (oxc#27309)
     const nowIso = new Date().toISOString();
     const wokeAt = resolved ? threadWokeAt(resolved.thread, { now: nowIso }) : null;
-    const undoPlan = ThreadUndo.planThreadUndo("settle", resolved?.thread);
+    const preservePin =
+      threadStarsEnabled && readEnvironmentSupportsThreadStars(target.environmentId);
+    const undoPlan = ThreadUndo.planThreadUndo("settle", resolved?.thread, { preservePin });
     // An older unpin/snooze Undo would re-pin or re-snooze, and the server
     // treats either as a promotion that un-settles; settling supersedes them.
     ThreadUndo.invalidate("pin", scopedThreadKey(target));
@@ -865,9 +867,7 @@ export function useThreadActions() {
       environmentId: target.environmentId,
       input: {
         threadId: target.threadId,
-        ...(threadStarsEnabled && readEnvironmentSupportsThreadStars(target.environmentId)
-          ? { preservePin: true }
-          : {}),
+        ...(preservePin ? { preservePin: true } : {}),
       },
     });
     if (result._tag !== "Success") {

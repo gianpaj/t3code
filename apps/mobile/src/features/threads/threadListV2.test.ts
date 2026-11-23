@@ -23,6 +23,8 @@ import {
   ProjectId,
   ProviderInstanceId,
   RunId,
+  nextThreadStarColor,
+  resolveThreadStar,
   RuntimeRequestId,
   ThreadId,
 } from "@t3tools/contracts";
@@ -1932,6 +1934,65 @@ describe("Priority inbox", () => {
     expect(build(false)).toMatchObject([
       { kind: "priority", count: 6, expanded: false },
       { kind: "other", count: 1, expanded: false },
+    ]);
+  });
+});
+
+describe("Thread stars", () => {
+  it("shows all colors in the existing order and restores pins with the beta off", () => {
+    const initialPin = DateTime.makeUnsafe("2026-06-01T00:00:00.000Z");
+    const source = (id: string, updates: Partial<OrchestrationV2ThreadShell> = {}) =>
+      presentThreadShell(
+        environmentId,
+        makeRawThreadShell({
+          id: ThreadId.make(id),
+          title: id,
+          ...updates,
+        }),
+      );
+    const inherited = source("inherited", { pinnedAt: initialPin, pinOrderKey: "a" });
+    const cleared = source("cleared", { pinnedAt: initialPin, pinOrderKey: "b", starColor: null });
+    const yellow = source("yellow", { starColor: "yellow", updatedAt: initialPin });
+    const blue = source("blue", { starColor: "blue", updatedAt: initialPin });
+    const archivedHistory = source("older-settled", {
+      starColor: "blue",
+      settledOverride: "settled",
+      settledAt: DateTime.makeUnsafe("2026-01-01T00:00:00.000Z"),
+    });
+    const unstarredHistory = source("other-settled", {
+      settledOverride: "settled",
+      settledAt: DateTime.makeUnsafe("2026-01-02T00:00:00.000Z"),
+    });
+    const threads = [inherited, cleared, yellow, blue, archivedHistory, unstarredHistory];
+    const build = (threadStars?: Parameters<typeof buildThreadListV2Items>[0]["threadStars"]) =>
+      buildThreadListV2Items({
+        threads,
+        environmentId: null,
+        searchQuery: "",
+        now: NOW,
+        settledShelfExpanded: true,
+        ...(threadStars === undefined ? {} : { threadStars }),
+      });
+    const readStar = (thread: EnvironmentThreadShell) => resolveThreadStar(thread.source);
+    const visible = build({ only: true, readStar });
+    expect(visible.inboxSections).toMatchObject([{ kind: "starred", count: 3 }]);
+    expect(visible.items.map(({ thread, starColor }) => [thread.id, starColor])).toEqual([
+      ["inherited", "green"],
+      ["blue", "blue"],
+      ["yellow", "yellow"],
+      ["older-settled", "blue"],
+    ]);
+    expect(visible.settledCount).toBe(1);
+    expect(
+      build()
+        .items.filter((item) => item.pinned)
+        .map(({ thread }) => thread.id),
+    ).toEqual(["inherited", "cleared"]);
+    expect(([null, "green", "yellow", "blue"] as const).map(nextThreadStarColor)).toEqual([
+      "green",
+      "yellow",
+      "blue",
+      null,
     ]);
   });
 });

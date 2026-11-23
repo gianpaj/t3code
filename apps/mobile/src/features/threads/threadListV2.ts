@@ -1,3 +1,4 @@
+import type { ThreadStarColor } from "@t3tools/contracts";
 import { msg } from "gt-react-native";
 import {
   canSnooze,
@@ -315,6 +316,7 @@ export function threadListV2RowAccessibilityLabel(
     readonly timeLabel: string;
     readonly snoozeWakeLabel: string | undefined;
     readonly providerNameLabel: string | null;
+    readonly starLabel?: string | undefined;
     readonly hasQueuedMessages: boolean;
     readonly regeneratingTitle: boolean;
   },
@@ -331,6 +333,7 @@ export function threadListV2RowAccessibilityLabel(
     input.title,
     meta,
     input.providerNameLabel,
+    input.starLabel ?? null,
     input.hasQueuedMessages ? resolve(msg("messages queued to send")) : null,
     input.regeneratingTitle ? resolve(msg("regenerating title")) : null,
   ]
@@ -409,6 +412,7 @@ export interface ThreadListV2Item {
   readonly variant: "card" | "slim";
   readonly snoozed: boolean;
   readonly pinned: boolean;
+  readonly starColor?: ThreadStarColor | undefined;
   readonly wokeAt: string | null;
   readonly isLast: boolean;
 }
@@ -432,7 +436,7 @@ export interface ThreadListV2Layout {
 }
 
 interface ThreadListV2InboxSection {
-  readonly kind: "priority" | "other";
+  readonly kind: "priority" | "other" | "starred";
   readonly start: number;
   readonly count: number;
   readonly visibleCount: number;
@@ -534,6 +538,7 @@ export function threadListV2ListItemsAreEqual(
         previous.item.variant === item.item.variant &&
         previous.item.snoozed === item.item.snoozed &&
         previous.item.pinned === item.item.pinned &&
+        previous.item.starColor === item.item.starColor &&
         previous.item.wokeAt === item.item.wokeAt &&
         previous.snoozeWakeLabelText === item.snoozeWakeLabelText &&
         previous.timeLabel === item.timeLabel &&
@@ -785,6 +790,10 @@ export function buildThreadListV2Items(input: {
     readonly hasOpenBranchPullRequest?: ((thread: EnvironmentThreadShell) => boolean) | undefined;
   };
   readonly readFilter?: ThreadReadFilter;
+  readonly threadStars?: {
+    readonly only: boolean;
+    readonly readStar: (thread: EnvironmentThreadShell) => ThreadStarColor | null;
+  };
   readonly workingShelfExpanded?: boolean;
   readonly isWorking?: (thread: EnvironmentThreadShell) => boolean;
   readonly inboxReturnAt?: (thread: EnvironmentThreadShell) => number | undefined;
@@ -817,6 +826,8 @@ export function buildThreadListV2Items(input: {
 
   const workingShelfEnabled = input.workingShelfEnabled === true;
   const readFilter = input.readFilter ?? "all";
+  const threadStars = input.threadStars;
+  const readStar = (thread: EnvironmentThreadShell) => threadStars?.readStar(thread) ?? undefined;
   const pinned: EnvironmentThreadShell[] = [];
   const active: EnvironmentThreadShell[] = [];
   const working: EnvironmentThreadShell[] = [];
@@ -830,7 +841,8 @@ export function buildThreadListV2Items(input: {
       isListedThreadLineage(thread.lineage) &&
       (input.environmentId === null || thread.environmentId === input.environmentId) &&
       (projectKeys === null || projectKeys.has(`${thread.environmentId}:${thread.projectId}`)) &&
-      (readFilter === "all" || matchesThreadReadFilter(thread, readFilter, undefined)),
+      (readFilter === "all" || matchesThreadReadFilter(thread, readFilter, undefined)) &&
+      (!threadStars?.only || readStar(thread) !== undefined),
   );
   // The same matches as the command palette, typo fallback included. Only
   // listed threads are ranked: a hidden exact match must not turn typos off.
@@ -874,7 +886,10 @@ export function buildThreadListV2Items(input: {
       queuedThreadKeys?.has(`${thread.environmentId}:${thread.id}`) === true;
     if (supportsSettlement && thread.settledOverride === "settled" && !hasQueuedMessages) {
       if (readFilter === "all") settled.push(thread);
-    } else if (thread.pinnedAt != null) {
+    } else if (
+      thread.pinnedAt != null &&
+      (threadStars === undefined || readStar(thread) !== undefined)
+    ) {
       pinned.push(thread);
     } else if (workingShelfEnabled && (input.isWorking ?? isThreadWorking)(thread)) {
       if (readFilter === "all") working.push(thread);
@@ -908,7 +923,8 @@ export function buildThreadListV2Items(input: {
         thread,
         variant: slim.has(thread) ? "slim" : "card",
         snoozed: snoozedThreads.has(thread),
-        pinned: pinnedThreads.has(thread),
+        pinned: threadStars === undefined && pinnedThreads.has(thread),
+        starColor: readStar(thread),
         wokeAt: slim.has(thread) ? null : resolveThreadListV2WokeAt(thread, { now }),
         isLast: index === results.length - 1,
       })),
@@ -975,59 +991,65 @@ export function buildThreadListV2Items(input: {
 
   const items: ThreadListV2Item[] = [];
   const inboxSections: ThreadListV2InboxSection[] = [];
-  for (const thread of applyPendingThreadOrder(
+  const orderedPinned = applyPendingThreadOrder(
     sortPinnedThreadsByOrderKey(pinned),
     "pinned",
     pending,
-  )) {
-    items.push({
-      thread,
-      variant: "card",
-      snoozed: false,
-      pinned: true,
-      wokeAt: resolveThreadListV2WokeAt(thread, { now }),
-      isLast: false,
-    });
-  }
-  const appendActive = (threads: readonly EnvironmentThreadShell[]) => {
+  );
+  const unstarredActive =
+    threadStars === undefined
+      ? orderedActive
+      : orderedActive.filter((thread) => readStar(thread) === undefined);
+  const appendCards = (threads: readonly EnvironmentThreadShell[], showPins = false) => {
     for (const thread of threads) {
       items.push({
         thread,
         variant: "card",
         snoozed: false,
-        pinned: false,
+        pinned: showPins,
+        starColor: readStar(thread),
         wokeAt: resolveThreadListV2WokeAt(thread, { now }),
         isLast: false,
       });
     }
   };
+  const appendSection = (
+    kind: ThreadListV2InboxSection["kind"],
+    threads: readonly EnvironmentThreadShell[],
+    expanded: boolean,
+    limit: number,
+  ) => {
+    if (threads.length === 0) return;
+    const visible = expanded
+      ? threads.slice(0, limit)
+      : threads.filter((thread) => `${thread.environmentId}:${thread.id}` === selectedThreadKey);
+    inboxSections.push({
+      kind,
+      start: items.length,
+      count: threads.length,
+      visibleCount: visible.length,
+      expanded,
+    });
+    appendCards(visible);
+  };
+  if (threadStars === undefined) {
+    appendCards(orderedPinned, true);
+  } else {
+    appendSection(
+      "starred",
+      [...orderedPinned, ...orderedActive.filter((thread) => readStar(thread) !== undefined)],
+      true,
+      Infinity,
+    );
+  }
   const inbox = input.priorityInbox;
   if (inbox === undefined) {
-    appendActive(orderedActive);
+    appendCards(unstarredActive);
   } else {
     const { priority, other } = groupPriorityInbox(
-      orderedActive,
+      unstarredActive,
       inbox.hasOpenBranchPullRequest ?? (() => false),
     );
-    const appendSection = (
-      kind: ThreadListV2InboxSection["kind"],
-      threads: readonly EnvironmentThreadShell[],
-      expanded: boolean,
-      limit: number,
-    ) => {
-      if (threads.length === 0) return;
-      const visible = expanded
-        ? threads.slice(0, limit)
-        : threads.filter((thread) => `${thread.environmentId}:${thread.id}` === selectedThreadKey);
-      inboxSections.push({
-        kind,
-        start: items.length,
-        count: threads.length,
-        visibleCount: visible.length,
-        expanded,
-      });
-      appendActive(visible);
-    };
     appendSection(
       "priority",
       priority,
@@ -1043,6 +1065,7 @@ export function buildThreadListV2Items(input: {
       variant: "card",
       snoozed: false,
       pinned: false,
+      starColor: readStar(thread),
       wokeAt: resolveThreadListV2WokeAt(thread, { now }),
       isLast: false,
     });
@@ -1054,6 +1077,7 @@ export function buildThreadListV2Items(input: {
       variant: "slim",
       snoozed: true,
       pinned: false,
+      starColor: readStar(thread),
       wokeAt: null,
       isLast: false,
     });
@@ -1065,6 +1089,7 @@ export function buildThreadListV2Items(input: {
       variant: "slim",
       snoozed: false,
       pinned: false,
+      starColor: readStar(thread),
       wokeAt: null,
       isLast: false,
     });

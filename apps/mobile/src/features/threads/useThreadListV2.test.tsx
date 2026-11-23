@@ -109,6 +109,17 @@ it("reuses a large thread list across tab renders and updates when its inputs ch
     seen.at(-1)!.layout.items.every((item) => item.thread.environmentId === environmentId),
   ).toBe(true);
 
+  await act(async () =>
+    root.render(
+      <Probe input={{ ...input, threadStars: { only: true, readStar: () => null } }} tab="chats" />,
+    ),
+  );
+  expect(vi.mocked(olderSettledThreads.shelfAtom).mock.lastCall?.[0]).toEqual([
+    { scope: { environmentId, projectIds: null, starredOnly: true }, pages: 0 },
+    { scope: { environmentId: otherEnvironmentId, projectIds: null, starredOnly: true }, pages: 0 },
+  ]);
+  expect(seen.at(-1)!.layout.items).toEqual([]);
+
   const queuedThreadKeys = new Set([`${environmentId}:thread-150`]);
   await act(async () => root.render(<Probe input={{ ...input, queuedThreadKeys }} tab="chats" />));
   const queued = seen.at(-1)!;

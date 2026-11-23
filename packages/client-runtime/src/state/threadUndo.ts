@@ -53,6 +53,7 @@ export function planThreadUndo(
     readonly unsettledAt?: string | null;
     readonly snoozedUntil?: string | null;
   } | null,
+  options?: { readonly preservePin?: boolean },
 ): ThreadUndoPlan {
   if (action === "snooze") return [{ action: "unsnooze" }];
   const pin: ThreadUndoStep = {
@@ -68,7 +69,9 @@ export function planThreadUndo(
   // Settling clears a manual active position; pinned threads are placed by their pin instead.
   const placement: ThreadUndoStep[] =
     thread?.pinnedAt != null
-      ? [pin]
+      ? options?.preservePin
+        ? []
+        : [pin]
       : thread?.activeOrderKey != null
         ? [{ action: "reorderActive", orderKey: thread.activeOrderKey }]
         : [];

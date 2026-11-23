@@ -18,6 +18,7 @@ export interface HomeListOptions {
   readonly selectedProjectKeys: readonly string[];
   readonly projectSortOrder: HomeProjectSortOrder;
   readonly readFilter: ThreadReadFilter;
+  readonly starredFilter: boolean;
 }
 
 export interface ResolvedHomeListOptions extends HomeListOptions {
@@ -29,6 +30,7 @@ function defaultHomeListOptions(filters?: ThreadListFilters): HomeListOptions {
     selectedEnvironmentId: filters?.environmentId ?? null,
     selectedProjectKeys: filters?.projectKeys ?? (filters?.projectKey ? [filters.projectKey] : []),
     readFilter: "all",
+    starredFilter: false,
     projectSortOrder:
       DEFAULT_SIDEBAR_PROJECT_SORT_ORDER === "manual"
         ? "updated_at"
@@ -134,6 +136,8 @@ export function useHomeListOptions(
     setSelectedEnvironmentId,
     setSelectedProjectKey,
     setProjectSortOrder,
+    toggleStarredFilter: () =>
+      updateOptions(({ starredFilter }) => ({ starredFilter: !starredFilter })),
     cycleReadFilter: () =>
       updateOptions(({ readFilter }) => ({ readFilter: nextThreadReadFilter[readFilter] })),
   } as const;

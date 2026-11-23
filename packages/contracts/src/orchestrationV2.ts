@@ -2479,6 +2479,12 @@ export function isOlderSettledThreadShell(
   );
 }
 
+const nextStarColor = { green: "yellow", yellow: "blue", blue: null } as const;
+
+export function nextThreadStarColor(color: ThreadStarColor | null): ThreadStarColor | null {
+  return color === null ? "green" : nextStarColor[color];
+}
+
 export function resolveThreadStar(
   thread: Pick<OrchestrationV2ThreadShell, "starColor" | "pinnedAt">,
 ): ThreadStarColor | null {

@@ -1,3 +1,4 @@
+import { useThreadStars } from "../../state/thread-stars";
 import { useHasOpenBranchPullRequest } from "../../state/use-thread-pr";
 import { useGT, useMessages } from "gt-react-native";
 
@@ -75,7 +76,7 @@ import { useQueuedThreadKeys } from "../../state/use-thread-outbox";
 import {
   ThreadListV2PendingRow,
   ThreadListV2Row,
-  ThreadListV2ShelfHeader,
+  ThreadListV2InboxHeader,
   ThreadListV2SettledShelfHeader,
   ThreadListV2ShowMoreRow,
   ThreadListV2SnoozedShelfHeader,
@@ -122,6 +123,8 @@ interface HomeScreenProps {
   readonly searchQuery: string;
   readonly readFilter?: Parameters<typeof useThreadListV2>[0]["readFilter"];
   readonly onCycleReadFilter?: () => void;
+  readonly starredFilter: boolean;
+  readonly onToggleStarredFilter: () => void;
   readonly selectedEnvironmentId: EnvironmentId | null;
   readonly selectedProjectKeys: readonly string[];
   readonly projectFilterOptions: readonly HomeListFilterMenuProject[];
@@ -387,6 +390,8 @@ export function HomeScreen(props: HomeScreenProps) {
   const handleRenameThread = props.onRenameThread;
   const handleDeleteThread = props.onDeleteThread;
   const handleUnsettleThread = props.onUnsettleThread;
+  const { enabled: threadStarsEnabled, readStar, cycleStar } = useThreadStars();
+  const starredOnly = threadStarsEnabled && props.starredFilter;
   const [settledVisibleCount, setSettledVisibleCount] = useState(
     THREAD_LIST_V2_SETTLED_INITIAL_COUNT,
   );
@@ -394,6 +399,7 @@ export function HomeScreen(props: HomeScreenProps) {
     props.selectedEnvironmentId,
     props.selectedProjectKeys,
     props.searchQuery.trim(),
+    starredOnly,
   ]);
   const [lastSettledResetKey, setLastSettledResetKey] = useState(settledResetKey);
   if (lastSettledResetKey !== settledResetKey) {
@@ -459,6 +465,7 @@ export function HomeScreen(props: HomeScreenProps) {
     workingShelfExpanded,
     priorityInboxEnabled,
     hasOpenBranchPullRequest,
+    threadStars: threadStarsEnabled ? { only: starredOnly, readStar } : undefined,
     priorityExpanded,
     otherExpanded,
     readFilter: props.readFilter,
@@ -525,12 +532,12 @@ export function HomeScreen(props: HomeScreenProps) {
     }
     if (item.type === "v2-inbox-section") {
       return (
-        <ThreadListV2ShelfHeader
+        <ThreadListV2InboxHeader
           kind={item.kind}
           count={item.count}
           disabled={item.disabled}
           expanded={item.expanded}
-          onToggle={() => toggleInboxSection(item.kind)}
+          onToggle={toggleInboxSection}
         />
       );
     }
@@ -585,6 +592,8 @@ export function HomeScreen(props: HomeScreenProps) {
         hasQueuedMessages={item.hasQueuedMessages}
         snoozed={item.item.snoozed}
         pinned={item.item.pinned}
+        starColor={item.item.starColor}
+        onCycleStar={threadStarsEnabled ? cycleStar : undefined}
         wokeAt={item.item.wokeAt}
         snoozePresetMinute={item.snoozePresetMinute ?? ""}
         snoozeWakeLabelText={item.snoozeWakeLabelText}
@@ -621,12 +630,15 @@ export function HomeScreen(props: HomeScreenProps) {
         onSettleThread={handleSettleThread}
         snoozeSupported={snoozeEnvironmentIds.has(thread.environmentId)}
         snoozePresets={snoozePresetsByEnvironmentId.get(thread.environmentId)}
-        pinningSupported={pinningEnvironmentIds.has(thread.environmentId)}
+        pinningSupported={!threadStarsEnabled && pinningEnvironmentIds.has(thread.environmentId)}
         autoSettleOptOutSupported={autoSettleOptOutEnvironmentIds.has(thread.environmentId)}
         reorderSupported={
           item.item.pinned
             ? pinReorderEnvironmentIds.has(thread.environmentId)
-            : !workingShelfEnabled && activeReorderEnvironmentIds.has(thread.environmentId)
+            : !workingShelfEnabled &&
+              activeReorderEnvironmentIds.has(thread.environmentId) &&
+              (!threadStarsEnabled ||
+                (thread.pinnedAt == null && item.item.starColor === undefined))
         }
         canMoveUp={item.canMoveUp}
         canMoveDown={item.canMoveDown}
@@ -729,7 +741,7 @@ export function HomeScreen(props: HomeScreenProps) {
   const v2ListHeader = (
     <>
       {listHeader}
-      {priorityInboxEnabled || (Platform.OS === "ios" && workspace) ? (
+      {priorityInboxEnabled || threadStarsEnabled || (Platform.OS === "ios" && workspace) ? (
         <ThreadListFilters
           gutter={sidebarSurface ? 8 : 0}
           environments={props.environments}
@@ -740,6 +752,8 @@ export function HomeScreen(props: HomeScreenProps) {
           onProjectChange={props.onProjectChange}
           readFilter={priorityInboxEnabled ? (props.readFilter ?? "all") : undefined}
           onCycleReadFilter={props.onCycleReadFilter}
+          starredOnly={starredOnly}
+          onToggleStarredFilter={threadStarsEnabled ? props.onToggleStarredFilter : undefined}
         />
       ) : null}
     </>
@@ -767,6 +781,7 @@ export function HomeScreen(props: HomeScreenProps) {
         variant={Platform.OS === "android" ? "plain" : undefined}
       />
     ) : (priorityInboxEnabled && props.readFilter !== undefined && props.readFilter !== "all") ||
+      starredOnly ||
       scopedProjectGroups.length > 1 ? (
       <EmptyState
         title={gt("No matching threads.")}
@@ -792,7 +807,12 @@ export function HomeScreen(props: HomeScreenProps) {
       />
     );
 
-  if (Platform.OS === "android" && threadListV2Items.length === 0 && !priorityInboxEnabled) {
+  if (
+    Platform.OS === "android" &&
+    threadListV2Items.length === 0 &&
+    !priorityInboxEnabled &&
+    !threadStarsEnabled
+  ) {
     return (
       <ScreenContent surface="screen">
         <View

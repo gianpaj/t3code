@@ -1144,6 +1144,7 @@ html[data-mobile-composer-route-transition="true"]::view-transition-old(t3-mobil
   --message-action-foreground: var(--primary-foreground);
   --message-action-hover: color-mix(in srgb, var(--primary) 90%, var(--background));
   --accent: var(--color-zinc-100);
+  --app-accent: var(--accent);
   --accent-foreground: var(--color-zinc-900);
   --error: var(--color-red-500);
   --error-foreground: var(--color-red-700);

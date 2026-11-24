@@ -127,7 +127,7 @@ import { ProviderInstanceIcon } from "../chat/ProviderInstanceIcon";
 import { getTriggerDisplayModelName } from "../chat/providerIconUtils";
 import { shouldShowInstanceBadge, type ProviderInstanceEntry } from "../../providerInstances";
 import { useThreadRunningTerminalIds } from "../../state/terminalSessions";
-import { InlineButton } from "../ui/button";
+import { Button, InlineButton } from "../ui/button";
 import { Kbd } from "../ui/kbd";
 import { Menu, MenuItem, MenuItemDetail, MenuPopup, MenuSeparator, MenuTrigger } from "../ui/menu";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
@@ -433,31 +433,35 @@ function ThreadStarControl(props: {
   );
   const starLabel = canChangeStar ? threadStarLabel(starColor, messages) : undefined;
   return canChangeStar ? (
-    <Tooltip>
-      <TooltipTrigger
-        render={
-          <button
-            type="button"
-            aria-label={starLabel}
-            onClick={(event) => {
-              event.preventDefault();
-              event.stopPropagation();
-              props.onCycleStar(threadRef);
-            }}
-            onPointerDown={(event) => event.stopPropagation()}
-            className={cn(
-              "inline-flex shrink-0 cursor-pointer items-center self-stretch rounded-md px-1.5 text-muted-foreground hover:text-foreground focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-ring",
-              starColor === null &&
-                !props.showActions &&
-                "pointer-events-none absolute inset-y-0 right-0 opacity-0 group-has-[:focus-visible]/sidebar-status-slot:pointer-events-auto group-has-[:focus-visible]/sidebar-status-slot:static group-has-[:focus-visible]/sidebar-status-slot:opacity-100 group-any-hover/sidebar-row:pointer-events-auto group-any-hover/sidebar-row:static group-any-hover/sidebar-row:opacity-100",
-            )}
-          />
-        }
-      >
-        {starIcon}
-      </TooltipTrigger>
-      <TooltipPopup side="top">{starLabel}</TooltipPopup>
-    </Tooltip>
+    <span
+      className={cn(
+        "flex h-full",
+        starColor === null &&
+          !props.showActions &&
+          "pointer-events-none absolute inset-y-0 right-0 opacity-0 group-has-[:focus-visible]/sidebar-status-slot:pointer-events-auto group-has-[:focus-visible]/sidebar-status-slot:static group-has-[:focus-visible]/sidebar-status-slot:opacity-100 group-any-hover/sidebar-row:pointer-events-auto group-any-hover/sidebar-row:static group-any-hover/sidebar-row:opacity-100",
+      )}
+    >
+      <Tooltip>
+        <TooltipTrigger
+          render={
+            <Button
+              variant="ghost-muted"
+              size="row-action"
+              aria-label={starLabel}
+              onClick={(event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                props.onCycleStar(threadRef);
+              }}
+              onPointerDown={(event) => event.stopPropagation()}
+            />
+          }
+        >
+          {starIcon}
+        </TooltipTrigger>
+        <TooltipPopup side="top">{starLabel}</TooltipPopup>
+      </Tooltip>
+    </span>
   ) : starColor === null ? null : (
     <span
       className="inline-flex shrink-0 items-center px-1.5"
@@ -492,12 +496,12 @@ function SnoozeMenuButton(props: {
           render={
             <MenuTrigger
               render={
-                <button
-                  type="button"
+                <Button
+                  variant="ghost-muted"
+                  size="row-action"
                   aria-label={gt("Snooze thread")}
                   onClick={(event) => event.stopPropagation()}
                   onDoubleClick={(event) => event.stopPropagation()}
-                  className="inline-flex h-full cursor-pointer items-center gap-0.5 rounded-md bg-transparent px-1.5 text-xs text-muted-foreground hover:text-foreground"
                 />
               }
             />
@@ -1466,7 +1470,7 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: SidebarThreadRowP
               ) : (
                 <span
                   className={cn(
-                    "group/sidebar-status-slot relative ml-auto flex h-6 min-w-8 shrink-0 items-center justify-end",
+                    "group/sidebar-status-slot relative ml-auto flex h-6 min-w-8 shrink-0 items-center justify-end [--accent:var(--app-accent)]",
                     props.sweepAction !== null && "hidden",
                     jumpHintLabel && JUMP_HINT_SLOT_CLASS_NAME,
                   )}
@@ -1568,28 +1572,33 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: SidebarThreadRowP
                         </TooltipPopup>
                       </Tooltip>
                     ) : (
-                      <Tooltip>
-                        <TooltipTrigger
-                          render={
-                            <button
-                              type="button"
-                              aria-label={gt("Settle thread")}
-                              onClick={handleSettleClick}
-                              onPointerDown={handleActionPointerDown}
-                              className={cn(
-                                "pointer-events-none absolute inset-y-0 right-0 inline-flex cursor-pointer items-center gap-1 rounded-md bg-transparent px-2 text-xs text-muted-foreground opacity-0 transition-opacity hover:text-foreground focus-visible:pointer-events-auto focus-visible:opacity-100 group-any-hover/sidebar-row:pointer-events-auto group-any-hover/sidebar-row:opacity-100",
-                                starControl === null && "-mr-2",
-                                isWoke && "group-any-hover/sidebar-row:static",
-                              )}
-                            />
-                          }
-                        >
-                          <CheckIcon className="size-3" />
-                        </TooltipTrigger>
-                        <TooltipPopup side="top">
-                          <T>Settle thread</T>
-                        </TooltipPopup>
-                      </Tooltip>
+                      <span
+                        className={cn(
+                          "pointer-events-none absolute inset-y-0 right-0 flex h-full opacity-0 transition-opacity has-[:focus-visible]:pointer-events-auto has-[:focus-visible]:opacity-100 group-any-hover/sidebar-row:pointer-events-auto group-any-hover/sidebar-row:opacity-100",
+                          starControl === null && "-mr-2",
+                          isWoke && "group-any-hover/sidebar-row:static",
+                        )}
+                      >
+                        <Tooltip>
+                          <TooltipTrigger
+                            render={
+                              <Button
+                                variant="ghost-muted"
+                                size="row-action"
+                                className="min-w-7"
+                                aria-label={gt("Settle thread")}
+                                onClick={handleSettleClick}
+                                onPointerDown={handleActionPointerDown}
+                              />
+                            }
+                          >
+                            <CheckIcon className="size-3" />
+                          </TooltipTrigger>
+                          <TooltipPopup side="top">
+                            <T>Settle thread</T>
+                          </TooltipPopup>
+                        </Tooltip>
+                      </span>
                     )}
                   </span>
                   {starControl}
@@ -1678,7 +1687,7 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: SidebarThreadRowP
               ) : (
                 <span
                   className={cn(
-                    "group/sidebar-status-slot relative ml-auto flex h-5 min-w-8 shrink-0 items-stretch justify-end text-xs",
+                    "group/sidebar-status-slot relative ml-auto flex h-5 min-w-8 shrink-0 items-stretch justify-end text-xs [--accent:var(--app-accent)]",
                     props.sweepAction !== null && "hidden",
                     jumpHintLabel && JUMP_HINT_SLOT_CLASS_NAME,
                   )}
@@ -1781,15 +1790,13 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: SidebarThreadRowP
                         <Tooltip>
                           <TooltipTrigger
                             render={
-                              <button
-                                type="button"
+                              <Button
+                                variant="ghost-muted"
+                                size="row-action"
                                 aria-label={gt("Settle thread")}
                                 onClick={handleSettleClick}
                                 onPointerDown={handleActionPointerDown}
-                                className={cn(
-                                  "inline-flex cursor-pointer items-center gap-1 rounded-md bg-transparent px-1.5 text-xs text-muted-foreground hover:text-foreground",
-                                  starControl === null && "-mr-1",
-                                )}
+                                className={starControl === null ? "-mr-1" : undefined}
                               />
                             }
                           >

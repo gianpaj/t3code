@@ -591,16 +591,20 @@ it.effect("rejects protected unary and streamed RPCs outside a guarded command",
       id: ScheduledTaskId.make("task"),
     }).pipe(Effect.provideService(EnvironmentSupervisor, supervisor), Effect.flip);
     expect(unary._tag).toBe("EnvironmentAuthorizationError");
-    const star = yield* requestGuarded(ORCHESTRATION_V2_WS_METHODS.dispatchCommand, {
-      type: "thread.star.set",
-      commandId: CommandId.make("star-command"),
-      threadId: ThreadId.make("thread"),
-      color: "green",
-    }).pipe(Effect.provideService(EnvironmentSupervisor, supervisor), Effect.flip);
-    expect(star).toMatchObject({
-      _tag: "EnvironmentAuthorizationError",
-      requiredScope: AuthOrchestrationOperateScope,
-    });
+    for (const change of [
+      { type: "thread.star.set", color: "green" },
+      { type: "thread.star.reorder", orderKey: "a0" },
+    ] as const) {
+      const star = yield* requestGuarded(ORCHESTRATION_V2_WS_METHODS.dispatchCommand, {
+        ...change,
+        commandId: CommandId.make("star-command"),
+        threadId: ThreadId.make("thread"),
+      }).pipe(Effect.provideService(EnvironmentSupervisor, supervisor), Effect.flip);
+      expect(star).toMatchObject({
+        _tag: "EnvironmentAuthorizationError",
+        requiredScope: AuthOrchestrationOperateScope,
+      });
+    }
     const streamed = yield* runStreamGuarded(WS_METHODS.gitRunStackedAction, {
       actionId: "test-action",
       cwd: "/repo",

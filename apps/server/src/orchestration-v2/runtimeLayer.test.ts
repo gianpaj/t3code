@@ -3804,6 +3804,39 @@ it.layer(layerTest)("OrchestrationV2LayerLive lifecycle", (it) => {
       yield* setStar("first", "green");
       assert.isNull(shellOf(yield* orchestrator.getShellSnapshot()).starColor);
 
+      yield* orchestrator.dispatch({
+        type: "thread.pin",
+        commandId: CommandId.make("runtime-layer-lifecycle-star-pin"),
+        threadId,
+        orderKey: "a0",
+      });
+      const changeStarOrder = (step: string) =>
+        orchestrator.dispatch({
+          type: "thread.star.reorder",
+          commandId: CommandId.make(`runtime-layer-lifecycle-star-order-${step}`),
+          threadId,
+          orderKey: "a1",
+        });
+      const lateReorder = yield* changeStarOrder("after-clear").pipe(Effect.flip);
+      assert.instanceOf(lateReorder, Orchestrator.OrchestratorDispatchError);
+      yield* setStar("re-add", "blue");
+      const pinnedShell = shellOf(yield* orchestrator.getShellSnapshot());
+      yield* changeStarOrder("move");
+      const reorderedShell = shellOf(yield* orchestrator.getShellSnapshot());
+      assert.equal(reorderedShell.starOrderKey, "a1");
+      assert.equal(reorderedShell.starColor, "blue");
+      assert.equal(reorderedShell.pinOrderKey, pinnedShell.pinOrderKey);
+      assert.deepEqual(reorderedShell.pinnedAt, pinnedShell.pinnedAt);
+      assert.deepEqual(reorderedShell.updatedAt, pinnedShell.updatedAt);
+      yield* setStar("remove", null);
+      yield* changeStarOrder("move");
+      assert.isNull(shellOf(yield* orchestrator.getShellSnapshot()).starOrderKey);
+      yield* orchestrator.dispatch({
+        type: "thread.unpin",
+        commandId: CommandId.make("runtime-layer-lifecycle-star-unpin"),
+        threadId,
+      });
+
       const preAutoProjection = yield* orchestrator.getThreadProjection(threadId);
       const staleAutoSettle = yield* orchestrator
         .dispatch({

@@ -25,7 +25,7 @@ import {
   type DragStartEvent,
   type Modifier,
 } from "@dnd-kit/core";
-import { SortableContext } from "@dnd-kit/sortable";
+import { SortableContext, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { restrictToFirstScrollableAncestor, restrictToVerticalAxis } from "@dnd-kit/modifiers";
 import {
   canSnooze,
@@ -42,7 +42,10 @@ import {
   PRIORITY_INBOX_LIMIT,
   type ThreadReadFilter,
 } from "@t3tools/client-runtime/state/thread-inbox";
-import { sortSettledThreads } from "@t3tools/client-runtime/state/thread-sort";
+import {
+  sortSettledThreads,
+  sortStarredThreadsByOrderKey,
+} from "@t3tools/client-runtime/state/thread-sort";
 import {
   nextShownOrder,
   threadSearchMatchKey,
@@ -198,8 +201,9 @@ import {
   firstValidTimestampMs,
   isSidebarNestedLinkClick,
   isTrailingDoubleClick,
-  orderInboxActiveDrop,
   orderItemsByPreferredIds,
+  orderSidebarFilteredDrop,
+  planSidebarStarredDrop,
   planSidebarThreadDrop,
   reduceSidebarProjectScopeMenuState,
   resolveAdjacentThreadId,
@@ -453,6 +457,7 @@ function useSidebarThreads(input: {
   readonly threadStarsEnabled: boolean;
   readonly pendingStars: ReadonlyMap<string, PendingStar>;
   readonly showPrioritySections: boolean;
+  readonly pendingStarOrder: readonly string[] | null;
   readonly serverConfigs: ReadonlyMap<EnvironmentId, EnvironmentServerConfig>;
   readonly connectedEnvironmentIds: readonly EnvironmentId[];
   readonly optimisticDrop: SidebarOptimisticDrop | null;
@@ -473,6 +478,7 @@ function useSidebarThreads(input: {
     threadStarsEnabled,
     pendingStars,
     showPrioritySections,
+    pendingStarOrder,
     serverConfigs,
     connectedEnvironmentIds,
     optimisticDrop,
@@ -576,7 +582,19 @@ function useSidebarThreads(input: {
               visibleThreadStar(thread, pendingStars.get(threadShellKey(thread))) !== null) &&
             (showShelves || inReadFilter(thread)),
         );
-  const pinnedThreads = filterThreads(partition.pinnedThreads);
+  const orderedStarredThreads =
+    pendingStarOrder === null
+      ? partition.starredThreads
+      : orderItemsByPreferredIds({
+          items: partition.starredThreads,
+          preferredIds: pendingStarOrder,
+          getId: threadShellKey,
+        });
+  const pinnedThreads = filterThreads(
+    threadStarsEnabled
+      ? orderedStarredThreads.filter(partition.inProjectScope)
+      : partition.pinnedThreads,
+  );
   const activeThreads = filterThreads(partition.activeThreads);
   const workingThreads = showShelves ? filterThreads(partition.workingThreads) : EMPTY_THREADS;
   const snoozedThreads = showShelves ? filterThreads(partition.snoozedThreads) : EMPTY_THREADS;
@@ -765,7 +783,18 @@ function partitionSidebarThreads(input: SidebarThreadPartitionInput) {
     sortActiveBySend,
   } = input;
   const preciseNow = new Date().toISOString();
-  const visible = filterSidebarV2VisibleThreads(threads, scopedProjectKeys, delegatedUnderParent);
+  const candidates = filterSidebarV2VisibleThreads(
+    threads,
+    threadStarsEnabled ? null : scopedProjectKeys,
+    delegatedUnderParent,
+  );
+  const inProjectScope = (thread: EnvironmentThreadShell) =>
+    scopedProjectKeys === null ||
+    scopedProjectKeys.has(`${thread.environmentId}:${thread.projectId}`);
+  const visible =
+    threadStarsEnabled && scopedProjectKeys !== null
+      ? candidates.filter(inProjectScope)
+      : candidates;
   const inboxObservation = inboxReturns.observe(workingShelfEnabled ? threads : null);
   const pinned: EnvironmentThreadShell[] = [];
   const active: EnvironmentThreadShell[] = [];
@@ -783,9 +812,12 @@ function partitionSidebarThreads(input: SidebarThreadPartitionInput) {
     serverConfigs,
     connectedEnvironmentIds: input.connectedEnvironmentIds,
   });
-  for (const thread of visible) {
+  for (const thread of candidates) {
     const configLoaded = serverConfigs.has(thread.environmentId);
-    const threadKey = scopedThreadKey(scopeThreadRef(thread.environmentId, thread.id));
+    const threadKey = threadShellKey(thread);
+    const isInScope = inProjectScope(thread);
+    const star = threadStarsEnabled ? visibleThreadStar(thread, pendingStars.get(threadKey)) : null;
+    if (!isInScope && star === null) continue;
     if (optimisticDrop?.key === threadKey) {
       const projected = applySidebarThreadDrop(
         thread,
@@ -807,18 +839,17 @@ function partitionSidebarThreads(input: SidebarThreadPartitionInput) {
       const section = resolveSidebarThreadSection({
         snoozed: configLoaded && effectiveSnoozed(thread, { now: preciseNow }),
         settled: configLoaded && thread.settledOverride === "settled",
-        pinned:
-          thread.pinnedAt != null &&
-          (!threadStarsEnabled || visibleThreadStar(thread, pendingStars.get(threadKey)) !== null),
+        pinned: thread.pinnedAt != null && (!threadStarsEnabled || star !== null),
       });
-      (section === "snoozed"
-        ? snoozed
-        : section === "settled"
-          ? settled
-          : section === "pinned"
-            ? pinned
-            : inbox(thread)
-      ).push(thread);
+      const bucket =
+        section === "snoozed"
+          ? snoozed
+          : section === "settled"
+            ? settled
+            : section === "pinned"
+              ? pinned
+              : inbox(thread);
+      if (isInScope || bucket === pinned || bucket === active) bucket.push(thread);
     }
   }
   // Availability gates dragging only; sorting must stay consistent across clients.
@@ -837,9 +868,13 @@ function partitionSidebarThreads(input: SidebarThreadPartitionInput) {
       })
     : sortedActive;
   return {
+    inProjectScope,
+    starredThreads: threadStarsEnabled
+      ? sortStarredThreadsByOrderKey([...sortedPinned, ...starred])
+      : EMPTY_THREADS,
     pinnedThreads:
       optimisticDrop?.section !== "pinned" || optimisticDrop.order === null
-        ? [...sortedPinned, ...starred]
+        ? sortedPinned
         : orderItemsByPreferredIds({
             items: sortedPinned,
             preferredIds: optimisticDrop.order,
@@ -1173,6 +1208,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
   const highlightedProjectScopeKeyRef = useRef<string | null>(null);
   // Hold dropped rows until server placement is confirmed; block another pickup from replacing the hold.
   const [optimisticDrop, setOptimisticDrop] = useState<SidebarOptimisticDrop | null>(null);
+  const [pendingStarOrder, setPendingStarOrder] = useState<readonly string[] | null>(null);
   const threadSearchInputRef = useRef<HTMLInputElement>(null);
   const [threadSearchQuery, setThreadSearchQuery] = useState("");
   const [selectedReadFilter, setReadFilter] = useState<ThreadReadFilter>("all");
@@ -1180,7 +1216,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
   const [starredFilter, setStarredFilter] = useState(false);
   const starredOnly = threadStarsEnabled && starredFilter;
   const starredFilterRef = useRef<HTMLButtonElement>(null);
-  const { pendingStars, cycleStar } = useThreadStars();
+  const { pendingStars, cycleStar, reorderStars } = useThreadStars();
   const starThread = useStableCallback((threadRef: ScopedThreadRef) => {
     if (
       threadStarsEnabled &&
@@ -1474,6 +1510,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
     prioritySection,
     otherSection,
     pinnedThreads,
+    starredThreads,
     draggableThreadKeys,
     activeReorderableThreadKeys,
     activeThreads,
@@ -1514,6 +1551,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
     starredOnly,
     threadStarsEnabled,
     pendingStars,
+    pendingStarOrder,
     showPrioritySections,
     serverConfigs,
     connectedEnvironmentIds,
@@ -1920,9 +1958,10 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
     };
   };
 
-  // Folder rows only drag out to the composer; folders own their order, so nothing drops in the list.
+  const isReorderingStarred = threadStarsEnabled && dragState?.activeSection === "pinned";
+  // Folders own their rows' order and only let those rows drag out to the composer.
   const isContextDrag =
-    projectFolders !== null ||
+    (projectFolders !== null && !isReorderingStarred) ||
     dragState?.contextDrag === true ||
     dragState?.activeSection === "working";
   const dragTargetSection = isContextDrag ? null : (dragState?.targetSection ?? null);
@@ -2132,6 +2171,25 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
     });
   };
   const hasProjectFolders = projectFolders !== null && projectFolders.length > 0;
+  const visibleStarredKeys = new Set(threadStarsEnabled ? pinnedKeys : []);
+  const starredOrder = starredThreads.map(threadShellKey);
+  const starOrderKeysById = new Map(
+    (threadStarsEnabled ? threads : EMPTY_THREADS).flatMap((thread) =>
+      thread.source.starOrderKey == null
+        ? []
+        : [[threadShellKey(thread), thread.source.starOrderKey] as const],
+    ),
+  );
+  const writableStarKeys = new Set(
+    starredThreads
+      .filter(
+        (thread) =>
+          connectedEnvironmentIds.includes(thread.environmentId) &&
+          serverConfigs.get(thread.environmentId)?.environment.capabilities.threadStarReorder ===
+            true,
+      )
+      .map(threadShellKey),
+  );
   const visiblePriorityKeys = new Set(prioritySection.visibleThreads.map(threadShellKey));
   const visibleOtherKeys = new Set(otherSection.visibleThreads.map(threadShellKey));
   const sidebarListItemsFresh = ((): readonly SidebarListItem[] => {
@@ -2253,6 +2311,16 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
     );
   };
   const sortableIds = sidebarListItems.map(sidebarListItemId);
+  const resolveStarredDrop = (activeKey: string, overId: string) =>
+    planSidebarStarredDrop({
+      activeKey,
+      overId,
+      target: resolveSidebarDropTarget(sidebarListItems, activeKey, overId),
+      fullOrder: starredOrder,
+      visibleKeys: visibleStarredKeys,
+      keysById: starOrderKeysById,
+      writableKeys: writableStarKeys,
+    });
   const resolveDropTarget = (activeKey: string, overId: string) => {
     const target = resolveSidebarDropTarget(sidebarListItems, activeKey, overId);
     if (threadStarsEnabled && target?.section === "pinned") return null;
@@ -2267,7 +2335,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
         groupPriorityInbox([thread], () => false).priority.length > 0);
     return {
       ...target,
-      activeOrder: orderInboxActiveDrop({
+      activeOrder: orderSidebarFilteredDrop({
         activeKey,
         fullOrder: activeKeys,
         dropOrder: target.activeOrder,
@@ -2277,7 +2345,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
   };
   // Keep non-drag orders constant to preserve sorting strategy and row identity during streaming.
   const { settledOrder: draggedSettledOrder, activeOrder: draggedActiveOrder } =
-    dragState === null
+    dragState === null || isReorderingStarred
       ? NO_DRAGGED_ORDERS
       : resolveDraggedOrders({
           drag: dragState,
@@ -2286,7 +2354,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
           activeThreads,
           workingShelfEnabled,
         });
-  const sidebarSortingStrategy = createSidebarSortingStrategy({
+  const lifecycleSortingStrategy = createSidebarSortingStrategy({
     items: sidebarListItems,
     enabled: !isContextDrag,
     boundaryLabelHeight: SIDEBAR_DRAG_LABEL_HEIGHT,
@@ -2297,12 +2365,18 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
     routeThreadKey: routeRowThreadKey,
     snoozedThreadCount: snoozedThreads.length,
   });
+  const sidebarSortingStrategy =
+    isReorderingStarred && !isContextDrag ? verticalListSortingStrategy : lifecycleSortingStrategy;
   const draggedThreadKey = dragState?.activeKey;
   const draggedFromSection = dragState?.activeSection;
   const dragActivationY = dragState?.activationY;
   const dndCollisionDetection = (() => {
     if (draggedThreadKey === undefined || draggedFromSection === undefined)
       return createSidebarCollisionDetection(() => true);
+    if (isReorderingStarred)
+      return createSidebarCollisionDetection(
+        (id) => resolveStarredDrop(draggedThreadKey, id) !== null,
+      );
     const source = threadByKey.get(draggedThreadKey);
     if (source === undefined) return createSidebarCollisionDetection(() => false);
     return createSidebarCollisionDetection(
@@ -2334,9 +2408,22 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
     );
   })();
   const handleThreadDragEnd = (event: DragEndEvent) => {
-    if (projectFolders !== null) return;
     const activeKey = String(event.active.id);
     const activeSection = sectionByThreadKey.get(activeKey);
+    if (threadStarsEnabled && activeSection === "pinned") {
+      if (event.over === null || pendingStarOrder !== null) return;
+      const plan = resolveStarredDrop(activeKey, String(event.over.id));
+      if (plan === null) return;
+      const assignments = plan.assignments.flatMap(({ id, orderKey }) => {
+        const ref = parseScopedThreadKey(id);
+        return ref === null ? [] : [{ ref, orderKey }];
+      });
+      if (!checkThreadOperations(assignments.map(({ ref }) => ref))) return;
+      setPendingStarOrder(plan.order);
+      void reorderStars(assignments).finally(() => setPendingStarOrder(null));
+      return;
+    }
+    if (projectFolders !== null) return;
     const target = event.over === null ? null : resolveDropTarget(activeKey, String(event.over.id));
     const activeThread = threadByKey.get(activeKey);
     if (activeSection === undefined || target === null || activeThread === undefined) return;
@@ -3780,12 +3867,15 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
                             key={threadKey}
                             sortableId={threadKey}
                             contextDrag={isContextDrag}
+                            reorderStar={threadStarsEnabled && section === "pinned"}
                             sortableDisabled={
                               renamingThreadKey === threadKey ||
                               !draggableThreadKeys.has(threadKey) ||
                               optimisticDrop !== null ||
                               (threadStarsEnabled &&
-                                (section === "pinned" || thread.pinnedAt != null))
+                                (section === "pinned"
+                                  ? pendingStarOrder !== null || !writableStarKeys.has(threadKey)
+                                  : thread.pinnedAt != null))
                             }
                             thread={thread}
                             starColor={
@@ -3895,7 +3985,10 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
                           />
                         );
                       };
-                      const from = isContextDrag ? null : (dragState?.activeSection ?? null);
+                      const from =
+                        isContextDrag || isReorderingStarred
+                          ? null
+                          : (dragState?.activeSection ?? null);
                       const items: ReactNode[] = [
                         <SidebarDraftBlock
                           key="draft-sessions"

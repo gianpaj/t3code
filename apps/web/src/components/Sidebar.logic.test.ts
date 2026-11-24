@@ -12,7 +12,7 @@ import {
   deleteSelectedThreadEntries,
   getFallbackThreadIdAfterDelete,
   hasUnseenCompletion,
-  orderInboxActiveDrop,
+  orderSidebarFilteredDrop,
   orderItemsByPreferredIds,
   pinOrderKeyBetween,
   resolveSidebarSweepKeys,
@@ -1207,7 +1207,7 @@ describe("Working shelf (beta)", () => {
     it("keeps filtered and capped rows in the saved order when reordering within Priority", () => {
       const fullOrder = ["first", "other", "second", "hidden"];
       expect(
-        orderInboxActiveDrop({
+        orderSidebarFilteredDrop({
           activeKey: "second",
           fullOrder,
           dropOrder: ["second", "first", "other"],

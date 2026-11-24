@@ -288,7 +288,7 @@ export function resolveSidebarDropTarget(
   return { section, pinnedOrder, activeOrder };
 }
 
-export function orderInboxActiveDrop(input: {
+export function orderSidebarFilteredDrop(input: {
   readonly activeKey: string;
   readonly fullOrder: readonly string[];
   readonly dropOrder: readonly string[];
@@ -318,6 +318,41 @@ export function orderInboxActiveDrop(input: {
         : order.length;
   order.splice(index, 0, activeKey);
   return order;
+}
+
+export function planSidebarStarredDrop(input: {
+  readonly activeKey: string;
+  readonly overId: string;
+  readonly target: SidebarDropTarget | null;
+  readonly fullOrder: readonly string[];
+  readonly visibleKeys: ReadonlySet<string>;
+  readonly keysById: ReadonlyMap<string, string | null | undefined>;
+  readonly writableKeys: ReadonlySet<string>;
+}) {
+  const { activeKey, overId, target, fullOrder, visibleKeys, keysById, writableKeys } = input;
+  if (
+    target?.section !== "pinned" ||
+    !visibleKeys.has(activeKey) ||
+    !visibleKeys.has(overId) ||
+    !writableKeys.has(activeKey)
+  ) {
+    return null;
+  }
+  const order = orderSidebarFilteredDrop({
+    activeKey,
+    fullOrder,
+    dropOrder: target.pinnedOrder,
+    visibleGroupKeys: visibleKeys,
+  });
+  if (order === fullOrder) return null;
+  // Unranked rows after the last assigned position keep their fallback order.
+  const lastRanked = order.findLastIndex((key) => key === activeKey || keysById.get(key) != null);
+  const assignments = planPinnedReorder({
+    orderedIds: order.slice(0, lastRanked + 1),
+    keysById,
+    movedId: activeKey,
+  });
+  return assignments.every(({ id }) => writableKeys.has(id)) ? { order, assignments } : null;
 }
 
 type SidebarThreadDropPlan =

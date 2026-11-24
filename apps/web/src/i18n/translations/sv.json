@@ -2477,6 +2477,7 @@
   "b08fe4c9d5c1ef5f": "Det gick inte att lossa tråden",
   "ce12d88ccfbf1221": "Det gick inte att ändra ordningen på aktiva trådar",
   "bfbb62b05e014f62": "Det gick inte att ändra ordningen på fästa trådar",
+  "24c02b195a88c0b5": "Det gick inte att ändra ordningen på stjärnmarkerade trådar",
   "195a5029df504a1e": "Det gick inte att snooza tråden",
   "8af746628aa06e30": "Markera som klar ({count})",
   "c12debf08e59743e": "Snooza ({count})",

@@ -251,6 +251,26 @@ export function sortPinnedThreadsByOrderKey<
   return [...keyed, ...keyless];
 }
 
+export function sortStarredThreadsByOrderKey<
+  T extends {
+    readonly id: string;
+    readonly environmentId: string;
+    readonly source: { readonly starOrderKey?: string | null };
+  },
+>(threads: readonly T[]): T[] {
+  return [...threads].sort((left, right) => {
+    const a = left.source.starOrderKey;
+    const b = right.source.starOrderKey;
+    if (a == null) return b == null ? 0 : 1;
+    if (b == null) return -1;
+    return a < b
+      ? -1
+      : a > b
+        ? 1
+        : left.id.localeCompare(right.id) || left.environmentId.localeCompare(right.environmentId);
+  });
+}
+
 export function sortActiveThreadsByOrderKey<
   T extends {
     readonly id: string;

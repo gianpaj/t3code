@@ -4,6 +4,7 @@ import {
   CommandId,
   nextThreadStarColor,
   resolveThreadStar,
+  type EnvironmentId,
   type ScopedThreadRef,
   type ThreadStarColor,
 } from "@t3tools/contracts";
@@ -21,7 +22,7 @@ import { environmentShell } from "../../state/shell";
 import { threadEnvironment } from "../../state/threads";
 import { useAtomCommand } from "../../state/use-atom-command";
 import { waitForAtomValue } from "../../state/waitForAtomValue";
-import { stackedThreadToast } from "../ui/toast";
+import { stackedThreadToast, toastManager } from "../ui/toast";
 
 export const threadStarClassName = {
   green: "text-green-600 dark:text-green-400",
@@ -57,9 +58,19 @@ export function visibleThreadStar(
   return pending === undefined ? resolveThreadStar(thread.source) : pending.color;
 }
 
+function waitForStarUpdate(environmentId: EnvironmentId, sequence: number) {
+  return waitForAtomValue({
+    registry: appAtomRegistry,
+    atom: environmentShell.stateValueAtom(environmentId),
+    predicate: (shell) => (Option.getOrNull(shell.snapshot)?.snapshotSequence ?? -1) >= sequence,
+    timeoutMs: 5_000,
+  });
+}
+
 export function useThreadStars() {
   const gt = useGT();
   const setStar = useAtomCommand(threadEnvironment.setStar, { reportFailure: false });
+  const reorderStar = useAtomCommand(threadEnvironment.reorderStar, { reportFailure: false });
   const pendingStars = useAtomValue(pendingStarsAtom);
 
   const cycleStar = useStableCallback(async (ref: ScopedThreadRef, onClear?: () => void) => {
@@ -84,13 +95,7 @@ export function useThreadStars() {
     });
     if (appAtomRegistry.get(pendingStarsAtom).get(key) !== update) return;
     if (result._tag === "Success") {
-      await waitForAtomValue({
-        registry: appAtomRegistry,
-        atom: environmentShell.stateValueAtom(ref.environmentId),
-        predicate: (shell) =>
-          (Option.getOrNull(shell.snapshot)?.snapshotSequence ?? -1) >= result.value.sequence,
-        timeoutMs: 5_000,
-      });
+      await waitForStarUpdate(ref.environmentId, result.value.sequence);
     } else {
       stackedThreadToast({ type: "error", title: gt("Couldn't update thread star") });
     }
@@ -102,5 +107,34 @@ export function useThreadStars() {
     }
   });
 
-  return { pendingStars, cycleStar };
+  const reorderStars = useStableCallback(
+    async (assignments: readonly { ref: ScopedThreadRef; orderKey: string }[]) => {
+      const receipts = new Map<EnvironmentId, number>();
+      for (const { ref, orderKey } of assignments) {
+        const result = await reorderStar({
+          environmentId: ref.environmentId,
+          input: {
+            type: "thread.star.reorder",
+            commandId: CommandId.make(randomUUID()),
+            threadId: ref.threadId,
+            orderKey,
+          },
+        });
+        if (result._tag === "Failure") {
+          toastManager.add(
+            stackedThreadToast({ type: "error", title: gt("Failed to reorder starred threads") }),
+          );
+          break;
+        }
+        receipts.set(ref.environmentId, result.value.sequence);
+      }
+      await Promise.all(
+        [...receipts].map(([environmentId, sequence]) =>
+          waitForStarUpdate(environmentId, sequence),
+        ),
+      );
+    },
+  );
+
+  return { pendingStars, cycleStar, reorderStars };
 }

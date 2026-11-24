@@ -563,17 +563,24 @@ export function SortableThreadRow(
     sortableId: string;
     sortableDisabled: boolean;
     contextDrag: boolean;
+    reorderStar: boolean;
   },
 ) {
-  const { sortableId, sortableDisabled, contextDrag, ...rowProps } = props;
+  const { sortableId, sortableDisabled, contextDrag, reorderStar, ...rowProps } = props;
   const canOperateThread = useEnvironmentScope(
     rowProps.thread.environmentId,
     AuthOrchestrationOperateScope,
   );
+  const canReorderStar = useAtomValue(
+    threadEnvironment.reorderStar.permissionAtom(
+      reorderStar ? rowProps.thread.environmentId : null,
+      { type: "thread.star.reorder" },
+    ),
+  );
   const { listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: sortableId,
     disabled:
-      sortableDisabled || !canOperateThread
+      sortableDisabled || !(reorderStar ? canReorderStar : canOperateThread)
         ? SIDEBAR_SORTABLE_DRAG_DISABLED
         : SIDEBAR_SORTABLE_DRAG_ENABLED,
     animateLayoutChanges: animateSidebarLayoutChanges,

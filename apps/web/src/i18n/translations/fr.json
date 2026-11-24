@@ -2477,6 +2477,7 @@
   "b08fe4c9d5c1ef5f": "Échec du désépinglage du fil",
   "ce12d88ccfbf1221": "Échec du réordonnancement des fils actifs",
   "bfbb62b05e014f62": "Échec du réordonnancement des fils épinglés",
+  "24c02b195a88c0b5": "Impossible de réorganiser les fils favoris",
   "195a5029df504a1e": "Échec du report du fil",
   "8af746628aa06e30": "Clore ({count})",
   "c12debf08e59743e": "Reporter ({count})",

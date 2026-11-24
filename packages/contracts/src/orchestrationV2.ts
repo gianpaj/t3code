@@ -529,6 +529,7 @@ export const OrchestrationV2AppThread = Schema.Struct({
   /** Absent on threads written before tags existed; read as empty. */
   tags: Schema.optional(StoredThreadTags),
   starColor: Schema.optionalKey(Schema.NullOr(ThreadStarColor)),
+  starOrderKey: Schema.optionalKey(Schema.NullOr(TrimmedNonEmptyString)),
   lastVisitedAt: Schema.NullOr(Schema.DateTimeUtc).pipe(
     Schema.withDecodingDefault(Effect.succeed(null)),
   ),
@@ -2421,6 +2422,7 @@ export const OrchestrationV2ThreadShell = Schema.Struct({
   /** Absent on threads written before tags existed; read as empty. */
   tags: Schema.optional(StoredThreadTags),
   starColor: Schema.optionalKey(Schema.NullOr(ThreadStarColor)),
+  starOrderKey: Schema.optionalKey(Schema.NullOr(TrimmedNonEmptyString)),
   lastVisitedAt: Schema.optional(Schema.NullOr(Schema.DateTimeUtc)),
   opens: Schema.optional(LenientThreadOpens),
   titleRegeneration: Schema.optional(
@@ -3403,6 +3405,12 @@ export const OrchestrationV2Command = Schema.Union([
     commandId: CommandId,
     threadId: ThreadId,
     color: Schema.NullOr(ThreadStarColor),
+  }),
+  Schema.Struct({
+    type: Schema.Literal("thread.star.reorder"),
+    commandId: CommandId,
+    threadId: ThreadId,
+    orderKey: TrimmedNonEmptyString,
   }),
   Schema.Struct({
     type: Schema.Literal("thread.pin.reorder"),

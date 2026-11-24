@@ -37,6 +37,7 @@ import {
   resolveSettledThreadTimestamp,
   resolveThreadActivityTimestamp,
   sortPinnedThreadsByOrderKey,
+  sortStarredThreadsByOrderKey,
   sortSettledThreads,
 } from "@t3tools/client-runtime/state/thread-sort";
 import { isListedThreadLineage, type EnvironmentId, type ProjectId } from "@t3tools/contracts";
@@ -1037,7 +1038,10 @@ export function buildThreadListV2Items(input: {
   } else {
     appendSection(
       "starred",
-      [...orderedPinned, ...orderedActive.filter((thread) => readStar(thread) !== undefined)],
+      sortStarredThreadsByOrderKey([
+        ...orderedPinned,
+        ...orderedActive.filter((thread) => readStar(thread) !== undefined),
+      ]),
       true,
       Infinity,
     );

@@ -2020,6 +2020,9 @@ export function threadShellFromProjection(
     ...(projection.thread.starColor !== undefined
       ? { starColor: projection.thread.starColor }
       : {}),
+    ...(projection.thread.starOrderKey !== undefined
+      ? { starOrderKey: projection.thread.starOrderKey }
+      : {}),
     lastVisitedAt: projection.thread.lastVisitedAt,
     opens: projection.thread.opens ?? null,
     titleRegeneration: projection.thread.titleRegeneration ?? null,
@@ -2320,6 +2323,9 @@ function shellFromState(input: {
     ...(input.state.thread.tags?.length ? { tags: input.state.thread.tags } : {}),
     ...(input.state.thread.starColor !== undefined
       ? { starColor: input.state.thread.starColor }
+      : {}),
+    ...(input.state.thread.starOrderKey !== undefined
+      ? { starOrderKey: input.state.thread.starOrderKey }
       : {}),
     lastVisitedAt: input.state.thread.lastVisitedAt,
     opens: input.state.thread.opens ?? null,

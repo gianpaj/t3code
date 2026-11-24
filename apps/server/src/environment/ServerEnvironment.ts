@@ -306,6 +306,7 @@ export const make = Effect.gen(function* () {
       shellThreadFamilies: true,
       shellOlderSettled: true,
       threadStars: true,
+      threadStarReorder: true,
     },
   };
 

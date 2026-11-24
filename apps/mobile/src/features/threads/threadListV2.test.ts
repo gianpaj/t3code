@@ -1964,9 +1964,12 @@ describe("Thread stars", () => {
       settledAt: DateTime.makeUnsafe("2026-01-02T00:00:00.000Z"),
     });
     const threads = [inherited, cleared, yellow, blue, archivedHistory, unstarredHistory];
-    const build = (threadStars?: Parameters<typeof buildThreadListV2Items>[0]["threadStars"]) =>
+    const build = (
+      threadStars?: Parameters<typeof buildThreadListV2Items>[0]["threadStars"],
+      list = threads,
+    ) =>
       buildThreadListV2Items({
-        threads,
+        threads: list,
         environmentId: null,
         searchQuery: "",
         now: NOW,
@@ -1983,6 +1986,13 @@ describe("Thread stars", () => {
       ["older-settled", "blue"],
     ]);
     expect(visible.settledCount).toBe(1);
+    const reordered = [
+      source("yellow", { starColor: "yellow", starOrderKey: "a0" }),
+      ...threads.filter((thread) => thread.id !== yellow.id),
+    ];
+    expect(build({ only: true, readStar }, reordered).items.map(({ thread }) => thread.id)).toEqual(
+      ["yellow", "inherited", "blue", "older-settled"],
+    );
     expect(
       build()
         .items.filter((item) => item.pinned)

@@ -107,7 +107,7 @@ export function clientRpcRequiredScopes(
     typeof input === "object" &&
     input !== null &&
     "type" in input &&
-    input.type === "thread.star.set"
+    (input.type === "thread.star.set" || input.type === "thread.star.reorder")
   ) {
     return [AuthOrchestrationOperateScope];
   }

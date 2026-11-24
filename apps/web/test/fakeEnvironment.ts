@@ -228,7 +228,7 @@ function run(
 
 export interface FakeThread extends Pick<
   OrchestrationV2ThreadShell,
-  "starColor" | "pinnedAt" | "pinOrderKey"
+  "starColor" | "starOrderKey" | "pinnedAt" | "pinOrderKey"
 > {
   readonly projectId?: ProjectId;
   readonly pullRequests?: OrchestrationV2ThreadShell["pullRequests"];
@@ -337,6 +337,7 @@ function shellOf(thread: FakeThread): OrchestrationV2ThreadShell {
     activeProviderThreadId: thread.providerThreads?.[0]?.id ?? null,
     ...(thread.issues === undefined ? {} : { issues: thread.issues }),
     ...(thread.starColor === undefined ? {} : { starColor: thread.starColor }),
+    ...(thread.starOrderKey === undefined ? {} : { starOrderKey: thread.starOrderKey }),
     ...(thread.pinnedAt === undefined ? {} : { pinnedAt: thread.pinnedAt }),
     ...(thread.pinOrderKey === undefined ? {} : { pinOrderKey: thread.pinOrderKey }),
     ...(thread.pullRequests === undefined ? {} : { pullRequests: thread.pullRequests }),
@@ -477,10 +478,20 @@ const handlers: Record<string, (input: never) => unknown> = {
     Effect.suspend(() => {
       dispatched.push(command);
       if (acceptCommands && !holdCommand(command)) {
-        if (command.type === "thread.star.set" && shellSubscriber !== null) {
+        if (
+          (command.type === "thread.star.set" || command.type === "thread.star.reorder") &&
+          shellSubscriber !== null
+        ) {
           const thread = threads.find((candidate) => candidate.id === command.threadId);
           if (thread !== undefined) {
-            const updated = { ...thread, starColor: command.color };
+            const updated =
+              command.type === "thread.star.reorder"
+                ? { ...thread, starOrderKey: command.orderKey }
+                : {
+                    ...thread,
+                    starColor: command.color,
+                    ...(command.color === null ? { starOrderKey: null } : {}),
+                  };
             threads = threads.map((candidate) => (candidate === thread ? updated : candidate));
             sequence += 1;
             return Queue.offer(shellSubscriber, {
@@ -701,6 +712,7 @@ export function installFakeEnvironment(
         capabilities: {
           ...baseServerConfig.environment.capabilities,
           threadStars: options?.threadStars === true,
+          threadStarReorder: options?.threadStars === true,
         },
       },
     };

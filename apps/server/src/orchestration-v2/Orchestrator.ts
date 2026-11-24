@@ -13,7 +13,7 @@ import {
   runRanAfter,
   usageLimitBlockedRun,
 } from "@t3tools/shared/orchestrationV2ThreadError";
-import { threadIssueKeysEqual } from "@t3tools/contracts";
+import { resolveThreadStar, threadIssueKeysEqual } from "@t3tools/contracts";
 import { canonicalizeGitCafePullRequestUrl } from "@t3tools/source-control-definitions/registry";
 import { threadPullRequestsOf } from "../sourceControl/threadPullRequests.ts";
 import {
@@ -660,6 +660,7 @@ function commandThreadId(command: OrchestrationV2ServerCommand): ThreadId {
     case "thread.active.reorder":
     case "thread.tag.set":
     case "thread.star.set":
+    case "thread.star.reorder":
     case "thread.visit":
     case "thread.mark-unread":
     case "thread.metadata.update":
@@ -4385,6 +4386,7 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
           | "thread.pin.reorder"
           | "thread.tag.set"
           | "thread.star.set"
+          | "thread.star.reorder"
           | "thread.active.reorder"
           | "thread.mark-unread"
           | "thread.metadata.update"
@@ -4547,6 +4549,7 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
         command.type === "thread.pin" ||
         command.type === "thread.unpin" ||
         command.type === "thread.pin.reorder" ||
+        command.type === "thread.star.reorder" ||
         command.type === "thread.active.reorder" ||
         command.type === "thread.pull-request.sync") &&
       thread.archivedAt !== null
@@ -4563,6 +4566,13 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
         commandId: command.commandId,
         commandType: command.type,
         cause: `Thread ${command.threadId} is not pinned and cannot be reordered.`,
+      });
+    }
+    if (command.type === "thread.star.reorder" && resolveThreadStar(thread) === null) {
+      return yield* new OrchestratorDispatchError({
+        commandId: command.commandId,
+        commandType: command.type,
+        cause: `Thread ${command.threadId} has no star and cannot be reordered.`,
       });
     }
     if (
@@ -5064,7 +5074,13 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
           };
         }
         case "thread.star.set":
-          return { ...thread, starColor: command.color };
+          return {
+            ...thread,
+            starColor: command.color,
+            ...(command.color === null ? { starOrderKey: null } : {}),
+          };
+        case "thread.star.reorder":
+          return { ...thread, starOrderKey: command.orderKey };
         case "thread.tag.set": {
           const current = thread.tags ?? [];
           return {
@@ -5545,6 +5561,7 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
         case "thread.tag.set":
           return "thread.tags-updated" as const;
         case "thread.star.set":
+        case "thread.star.reorder":
           return "thread.star-updated" as const;
         case "thread.mark-unread":
           return "thread.marked-unread" as const;
@@ -15831,6 +15848,7 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
       case "thread.active.reorder":
       case "thread.tag.set":
       case "thread.star.set":
+      case "thread.star.reorder":
       case "thread.mark-unread":
       case "thread.pull-request.link":
       case "thread.pull-request.unlink":
